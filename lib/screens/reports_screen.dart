@@ -9,7 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
-import 'visitor_model.dart';
+import '../models/visitor_model.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({Key? key}) : super(key: key);
@@ -353,19 +353,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
           pageFormat: PdfPageFormat.a4,
           build: (context) {
             return [
-              pw.Text('Visitor Report', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Visitor Report',
+                  style: pw.TextStyle(
+                      fontSize: 20, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 10),
               pw.Table.fromTextArray(
-                headers: const ['Name', 'Contact', 'Host', 'Purpose', 'Status', 'Check-in', 'Check-out'],
-                data: visitors.map((v) => [
-                  v.name,
-                  v.contact,
-                  v.hostName,
-                  v.purpose,
-                  v.status,
-                  df.format(v.checkIn),
-                  v.checkOut != null ? df.format(v.checkOut!) : '',
-                ]).toList(),
+                headers: const [
+                  'Name',
+                  'Contact',
+                  'Host',
+                  'Purpose',
+                  'Status',
+                  'Check-in',
+                  'Check-out'
+                ],
+                data: visitors
+                    .map((v) => [
+                          v.name,
+                          v.contact,
+                          v.hostName,
+                          v.purpose,
+                          v.status,
+                          df.format(v.checkIn),
+                          v.checkOut != null ? df.format(v.checkOut!) : '',
+                        ])
+                    .toList(),
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 cellStyle: const pw.TextStyle(fontSize: 10),
               ),
@@ -374,9 +386,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
       );
       final pdfBytes = await pdf.save();
-      final pdfFile = File('${dir.path}/visitors_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf');
+      final pdfFile = File(
+          '${dir.path}/visitors_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf');
       await pdfFile.writeAsBytes(pdfBytes);
-      await Share.shareXFiles([XFile(pdfFile.path)], text: 'Visitor report (PDF)');
+      await Share.shareXFiles([XFile(pdfFile.path)],
+          text: 'Visitor report (PDF)');
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Export failed: $e')));

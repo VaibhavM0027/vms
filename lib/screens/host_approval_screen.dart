@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'firebase_services.dart';
-import 'visitor_model.dart';
+import '../services/visitor_service.dart';
+import '../models/visitor_model.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
