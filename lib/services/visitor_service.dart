@@ -22,6 +22,11 @@ class FirebaseServices {
     }
   }
 
+  // Get current user ID
+  String? getCurrentUserId() {
+    return _auth.currentUser?.uid;
+  }
+
   // Visitor Operations
   Future<String> addVisitor(Visitor visitor) async {
     try {
@@ -29,6 +34,7 @@ class FirebaseServices {
       final docRef = _firestore.collection('visitors').doc();
       final data = visitor.toMap();
       data['qrCode'] = data['qrCode'] ?? docRef.id;
+      data['createdAt'] = FieldValue.serverTimestamp();
       await docRef.set(data);
       return docRef.id;
     } catch (e) {
@@ -58,10 +64,43 @@ class FirebaseServices {
     }
   }
 
+  Future<void> checkInVisitor(String visitorId) async {
+    try {
+      await _firestore.collection('visitors').doc(visitorId).update({
+        'checkIn': FieldValue.serverTimestamp(),
+        'status': 'checked-in',
+      });
+    } catch (e) {
+      throw Exception('Failed to check-in visitor: $e');
+    }
+  }
+
+  Future<void> checkOutVisitor(String visitorId, String? meetingNotes) async {
+    try {
+      await _firestore.collection('visitors').doc(visitorId).update({
+        'checkOut': FieldValue.serverTimestamp(),
+        'status': 'completed',
+        'meetingNotes': meetingNotes,
+      });
+    } catch (e) {
+      throw Exception('Failed to check-out visitor: $e');
+    }
+  }
+
   Stream<List<Visitor>> getAllPendingVisitors() {
     return _firestore
         .collection('visitors')
         .where('status', isEqualTo: 'pending')
+        .orderBy('checkIn', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Visitor.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  Stream<List<Visitor>> getAllVisitors() {
+    return _firestore
+        .collection('visitors')
         .orderBy('checkIn', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -114,14 +153,63 @@ class FirebaseServices {
             .toList());
   }
 
+  // Get visitors for reports with date filtering
+  Future<List<Visitor>> getVisitorsForReports(DateTime startDate, DateTime endDate) async {
+    try {
+      final snapshot = await _firestore
+          .collection('visitors')
+          .where('checkIn',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('checkIn',
+              isLessThanOrEqualTo: Timestamp.fromDate(endDate.add(const Duration(days: 1))))
+          .get();
+
+      return snapshot.docs
+          .map((doc) => Visitor.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch visitors for reports: $e');
+    }
+  }
+
+  // Get visitor by QR code
+  Future<Visitor?> getVisitorByQRCode(String qrCode) async {
+    try {
+      final snapshot = await _firestore
+          .collection('visitors')
+          .where('qrCode', isEqualTo: qrCode)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        return Visitor.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Failed to fetch visitor by QR code: $e');
+    }
+  }
+
   // Image Upload
   Future<String> uploadIdImage(String visitorId, String filePath) async {
     try {
-      Reference ref = _storage.ref().child('visitor_ids/$visitorId.jpg');
-      await ref.putFile(File(filePath));
+      final file = File(filePath);
+      final ref = _storage.ref().child('visitor_ids/$visitorId.jpg');
+      await ref.putFile(file);
       return await ref.getDownloadURL();
     } catch (e) {
       throw Exception('Failed to upload image: $e');
+    }
+  }
+
+  Future<String> uploadVisitorPhoto(String visitorId, String filePath) async {
+    try {
+      final file = File(filePath);
+      final ref = _storage.ref().child('visitor_photos/$visitorId.jpg');
+      await ref.putFile(file);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      throw Exception('Failed to upload photo: $e');
     }
   }
 
@@ -130,9 +218,9 @@ class FirebaseServices {
     try {
       await _firestore.collection('notifications').add({
         'hostId': hostId,
-        'title': 'Visitor arrived',
-        'body': '$visitorName is at reception',
-        'createdAt': FieldValue.serverTimestamp(),
+        'visitorName': visitorName,
+        'message': 'New visitor $visitorName is waiting for approval',
+        'timestamp': FieldValue.serverTimestamp(),
         'read': false,
       });
     } catch (e) {
@@ -140,8 +228,65 @@ class FirebaseServices {
     }
   }
 
-  // Get current user ID
-  String? getCurrentUserId() {
-    return _auth.currentUser?.uid;
+  // Get notifications for a host
+  Stream<List<Map<String, dynamic>>> getNotificationsForHost(String hostId) {
+    return _firestore
+        .collection('notifications')
+        .where('hostId', isEqualTo: hostId)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  ...doc.data(),
+                })
+            .toList());
+  }
+
+  // Mark notification as read
+  Future<void> markNotificationAsRead(String notificationId) async {
+    try {
+      await _firestore
+          .collection('notifications')
+          .doc(notificationId)
+          .update({'read': true});
+    } catch (e) {
+      throw Exception('Failed to mark notification as read: $e');
+    }
+  }
+
+  // Delete visitor
+  Future<void> deleteVisitor(String visitorId) async {
+    try {
+      await _firestore.collection('visitors').doc(visitorId).delete();
+    } catch (e) {
+      throw Exception('Failed to delete visitor: $e');
+    }
+  }
+
+  // Get visitor statistics
+  Future<Map<String, dynamic>> getVisitorStatistics() async {
+    try {
+      final snapshot = await _firestore.collection('visitors').get();
+      final visitors = snapshot.docs
+          .map((doc) => Visitor.fromMap(doc.data(), doc.id))
+          .toList();
+
+      final total = visitors.length;
+      final pending = visitors.where((v) => v.status == 'pending').length;
+      final approved = visitors.where((v) => v.status == 'approved').length;
+      final completed = visitors.where((v) => v.status == 'completed').length;
+      final rejected = visitors.where((v) => v.status == 'rejected').length;
+
+      return {
+        'total': total,
+        'pending': pending,
+        'approved': approved,
+        'completed': completed,
+        'rejected': rejected,
+      };
+    } catch (e) {
+      throw Exception('Failed to get visitor statistics: $e');
+    }
   }
 }

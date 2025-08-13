@@ -6,6 +6,7 @@ import 'reports_screen.dart';
 import 'guard_scan_screen.dart';
 import 'settings_screen.dart';
 import 'host_approval_screen.dart';
+import 'visitor_self_register_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'pre_register_screen.dart';
@@ -97,6 +98,13 @@ class DashboardScreen extends StatelessWidget {
                 'Settings',
                 const SettingsScreen(),
               ),
+            // Add visitor self-registration option for all roles
+            _buildDashboardItem(
+              context,
+              Icons.qr_code,
+              'Self Register',
+              const VisitorSelfRegisterScreen(),
+            ),
           ],
         ),
       ),

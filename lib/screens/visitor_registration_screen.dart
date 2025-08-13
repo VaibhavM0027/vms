@@ -18,6 +18,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _contactController = TextEditingController();
+  final _emailController = TextEditingController();
   final _purposeController = TextEditingController();
   String? _selectedHostId;
   String? _selectedHostName;
@@ -49,11 +50,11 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
           {'id': 'host_sales_006', 'name': 'Jennifer Davis - Sales Manager'},
         ];
       });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading hosts: $e')),
-      );
-    }
+          } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading hosts: $e')),
+        );
+      }
   }
 
   Future<void> _submitForm() async {
@@ -74,6 +75,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
         Visitor visitor = Visitor(
           name: _nameController.text,
           contact: _contactController.text,
+          email: _emailController.text,
           purpose: _purposeController.text,
           hostId: _selectedHostId!,
           hostName: _selectedHostName!,
@@ -204,14 +206,24 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                   controller: _nameController,
                   style: TextStyle(color: Colors.grey[100]),
                   decoration: InputDecoration(
-                    labelText: 'Visitor Name',
+                    labelText: 'Visitor Name *',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.person, color: Colors.grey[400]),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.blue),
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
+                    if (value == null || value.trim().isEmpty) {
                       return 'Please enter visitor name';
                     }
                     return null;
@@ -224,16 +236,60 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                   controller: _contactController,
                   style: TextStyle(color: Colors.grey[100]),
                   decoration: InputDecoration(
-                    labelText: 'Contact Number',
+                    labelText: 'Contact Number *',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.phone, color: Colors.grey[400]),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.blue),
                     ),
                   ),
                   keyboardType: TextInputType.phone,
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
+                    if (value == null || value.trim().isEmpty) {
                       return 'Please enter contact number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Email Address
+                TextFormField(
+                  controller: _emailController,
+                  style: TextStyle(color: Colors.grey[100]),
+                  decoration: InputDecoration(
+                    labelText: 'Email Address *',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    prefixIcon: Icon(Icons.email, color: Colors.grey[400]),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.blue),
+                    ),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter email address';
+                    }
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                      return 'Please enter a valid email address';
                     }
                     return null;
                   },
@@ -245,15 +301,25 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                   controller: _purposeController,
                   style: TextStyle(color: Colors.grey[100]),
                   decoration: InputDecoration(
-                    labelText: 'Purpose of Visit',
+                    labelText: 'Purpose of Visit *',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon:
                         Icon(Icons.description, color: Colors.grey[400]),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.blue),
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
+                    if (value == null || value.trim().isEmpty) {
                       return 'Please enter purpose of visit';
                     }
                     return null;
@@ -266,10 +332,20 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                   style: TextStyle(color: Colors.grey[100]),
                   dropdownColor: Colors.grey[850],
                   decoration: InputDecoration(
-                    labelText: 'Host/Person to Meet',
+                    labelText: 'Host/Person to Meet *',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.work, color: Colors.grey[400]),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[600]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.blue),
                     ),
                   ),
                   value: _selectedHostId,
@@ -334,5 +410,14 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _contactController.dispose();
+    _emailController.dispose();
+    _purposeController.dispose();
+    super.dispose();
   }
 }

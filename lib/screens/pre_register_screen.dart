@@ -117,6 +117,7 @@ class _PreRegisterScreenState extends State<PreRegisterScreen> {
       final visitor = Visitor(
         name: _nameController.text.trim(),
         contact: _contactController.text.trim(),
+        email: '', // Pre-registered visitors don't have email initially
         purpose: _purposeController.text.trim(),
         hostId: _selectedHostId!,
         hostName: _selectedHostName!,

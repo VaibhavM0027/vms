@@ -33,6 +33,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           id: visitor.id,
           name: visitor.name,
           contact: visitor.contact,
+          email: visitor.email,
           purpose: visitor.purpose,
           hostId: visitor.hostId,
           hostName: visitor.hostName,

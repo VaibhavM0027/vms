@@ -4,6 +4,7 @@ class Visitor {
   final String? id;
   final String name;
   final String contact;
+  final String email;
   final String purpose;
   final String hostId;
   final String hostName;
@@ -19,6 +20,7 @@ class Visitor {
     this.id,
     required this.name,
     required this.contact,
+    required this.email,
     required this.purpose,
     required this.hostId,
     required this.hostName,
@@ -35,6 +37,7 @@ class Visitor {
     return {
       'name': name,
       'contact': contact,
+      'email': email,
       'purpose': purpose,
       'hostId': hostId,
       'hostName': hostName,
@@ -51,19 +54,24 @@ class Visitor {
   factory Visitor.fromMap(Map<String, dynamic> map, String id) {
     return Visitor(
       id: id,
-      name: map['name'],
-      contact: map['contact'],
-      purpose: map['purpose'],
-      hostId: map['hostId'],
-      hostName: map['hostName'],
+      name: map['name'] ?? '',
+      contact: map['contact'] ?? '',
+      email: map['email'] ?? '',
+      purpose: map['purpose'] ?? '',
+      hostId: map['hostId'] ?? '',
+      hostName: map['hostName'] ?? '',
       idImageUrl: map['idImageUrl'],
-      visitDate: (map['visitDate'] as Timestamp).toDate(),
-      checkIn: (map['checkIn'] as Timestamp).toDate(),
+      visitDate: map['visitDate'] != null 
+          ? (map['visitDate'] as Timestamp).toDate()
+          : DateTime.now(),
+      checkIn: map['checkIn'] != null 
+          ? (map['checkIn'] as Timestamp).toDate()
+          : DateTime.now(),
       checkOut: map['checkOut'] != null
           ? (map['checkOut'] as Timestamp).toDate()
           : null,
       meetingNotes: map['meetingNotes'],
-      status: map['status'],
+      status: map['status'] ?? 'pending',
       qrCode: map['qrCode'],
     );
   }
