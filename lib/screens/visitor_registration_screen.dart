@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/visitor_service.dart';
 import '../models/visitor_model.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import '../widgets/qr_code_widget.dart';
 
 class VisitorRegistrationScreen extends StatefulWidget {
   final String? idImagePath;
@@ -58,118 +58,61 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
   }
 
   Future<void> _submitForm() async {
-    if (_formKey.currentState!.validate() && _selectedHostId != null) {
-      setState(() => _isLoading = true);
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedHostId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a host')),
+      );
+      return;
+    }
 
-      try {
-        String? idImageUrl;
-        if (widget.idImagePath != null) {
-          idImageUrl = await _firebaseServices.uploadIdImage(
-            'visitor_${DateTime.now().millisecondsSinceEpoch}',
-            widget.idImagePath!,
-          );
-        }
+    setState(() => _isLoading = true);
 
-        // Create visitor
-        final now = DateTime.now();
-        Visitor visitor = Visitor(
-          name: _nameController.text,
-          contact: _contactController.text,
-          email: _emailController.text,
-          purpose: _purposeController.text,
-          hostId: _selectedHostId!,
-          hostName: _selectedHostName!,
-          idImageUrl: idImageUrl,
-          visitDate: now,
-          checkIn: now,
-          status: 'pending',
-          qrCode: null,
-        );
+    try {
+      final visitor = Visitor(
+        name: _nameController.text.trim(),
+        contact: _contactController.text.trim(),
+        email: _emailController.text.trim(),
+        purpose: _purposeController.text.trim(),
+        hostId: _selectedHostId!,
+        hostName: _selectedHostName!,
+        visitDate: DateTime.now(),
+        checkIn: DateTime.now(),
+        status: 'pending',
+      );
 
-        // Save to Firestore
-        String visitorId = await _firebaseServices.addVisitor(visitor);
+      final visitorId = await _firebaseServices.addVisitor(visitor);
 
-        // Send notification to host
-        await _firebaseServices.sendNotificationToHost(
-          _selectedHostId!,
-          _nameController.text,
-        );
+      if (!mounted) return;
 
-        if (!mounted) return;
+      // Show QR code dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => QRCodeDialog(
+          qrData: visitorId,
+          visitorName: visitor.name,
+          visitorContact: visitor.contact,
+          visitorPurpose: visitor.purpose,
+          onDone: () => Navigator.popUntil(context, (route) => route.isFirst),
+        ),
+      );
 
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: Colors.grey[850],
-            title: Text(
-              'Registration Successful',
-              style: TextStyle(color: Colors.grey[100]),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Visitor: ${_nameController.text}',
-                        style: TextStyle(
-                            color: Colors.grey[300],
-                            fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Host: $_selectedHostName',
-                        style: TextStyle(color: Colors.grey[400]),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Show this QR at the security gate',
-                  style: TextStyle(color: Colors.grey[300]),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: QrImageView(
-                    data: visitorId,
-                    version: QrVersions.auto,
-                    size: 180,
-                    backgroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () =>
-                    Navigator.popUntil(context, (route) => route.isFirst),
-                child: Text(
-                  'Done',
-                  style: TextStyle(color: Colors.grey[300]),
-                ),
-              ),
-            ],
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      } finally {
-        setState(() => _isLoading = false);
-      }
+      // Clear form
+      _nameController.clear();
+      _contactController.clear();
+      _emailController.clear();
+      _purposeController.clear();
+      setState(() {
+        _selectedHostId = null;
+        _selectedHostName = null;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -178,7 +121,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Visitor Registration'),
+        title: const Text('Register Visitor'),
         backgroundColor: Colors.black,
         elevation: 0,
       ),
@@ -187,11 +130,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.black,
-              Colors.grey[900]!,
-              Colors.black,
-            ],
+            colors: [Colors.black, Colors.grey[900]!, Colors.black],
           ),
         ),
         child: SingleChildScrollView(
@@ -199,207 +138,230 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Visitor Name
-                TextFormField(
-                  controller: _nameController,
-                  style: TextStyle(color: Colors.grey[100]),
-                  decoration: InputDecoration(
-                    labelText: 'Visitor Name *',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.person, color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.blue),
-                    ),
+                // Header
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[850]!,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.grey[800]!.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))],
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter visitor name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Contact Number
-                TextFormField(
-                  controller: _contactController,
-                  style: TextStyle(color: Colors.grey[100]),
-                  decoration: InputDecoration(
-                    labelText: 'Contact Number *',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.phone, color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.blue),
-                    ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.person_add, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Register New Visitor',
+                        style: TextStyle(fontSize: 24, color: Colors.grey[100], fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Enter visitor details to generate QR code',
+                        style: TextStyle(fontSize: 16, color: Colors.grey[400]),
+                      ),
+                    ],
                   ),
-                  keyboardType: TextInputType.phone,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter contact number';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // Email Address
-                TextFormField(
-                  controller: _emailController,
-                  style: TextStyle(color: Colors.grey[100]),
-                  decoration: InputDecoration(
-                    labelText: 'Email Address *',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.email, color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.blue),
-                    ),
+                // Form Fields
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[850]!,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.grey[800]!.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))],
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter email address';
-                    }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
-                      return 'Please enter a valid email address';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Purpose of Visit
-                TextFormField(
-                  controller: _purposeController,
-                  style: TextStyle(color: Colors.grey[100]),
-                  decoration: InputDecoration(
-                    labelText: 'Purpose of Visit *',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
-                    prefixIcon:
-                        Icon(Icons.description, color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.blue),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Visitor Information',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[100], fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Name Field
+                      TextFormField(
+                        controller: _nameController,
+                        style: TextStyle(color: Colors.grey[100]),
+                        decoration: InputDecoration(
+                          labelText: 'Full Name',
+                          labelStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: Icon(Icons.person, color: Colors.grey[400]),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[600]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter visitor name';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Contact Field
+                      TextFormField(
+                        controller: _contactController,
+                        style: TextStyle(color: Colors.grey[100]),
+                        decoration: InputDecoration(
+                          labelText: 'Contact Number',
+                          labelStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: Icon(Icons.phone, color: Colors.grey[400]),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[600]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter contact number';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Email Field
+                      TextFormField(
+                        controller: _emailController,
+                        style: TextStyle(color: Colors.grey[100]),
+                        decoration: InputDecoration(
+                          labelText: 'Email Address',
+                          labelStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: Icon(Icons.email, color: Colors.grey[400]),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[600]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter email address';
+                          }
+                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                            return 'Please enter a valid email address';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Purpose Field
+                      TextFormField(
+                        controller: _purposeController,
+                        style: TextStyle(color: Colors.grey[100]),
+                        decoration: InputDecoration(
+                          labelText: 'Purpose of Visit',
+                          labelStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: Icon(Icons.description, color: Colors.grey[400]),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[600]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter purpose of visit';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Host Selection
+                      DropdownButtonFormField<String>(
+                        value: _selectedHostId,
+                        style: TextStyle(color: Colors.grey[100]),
+                        decoration: InputDecoration(
+                          labelText: 'Select Host',
+                          labelStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: Icon(Icons.work, color: Colors.grey[400]),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[600]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        dropdownColor: Colors.grey[850],
+                        items: _hosts.map((host) {
+                          return DropdownMenuItem<String>(
+                            value: host['id'],
+                            child: Text(
+                              host['name']!,
+                              style: TextStyle(color: Colors.grey[100]),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedHostId = value;
+                            _selectedHostName = _hosts.firstWhere((host) => host['id'] == value)['name'];
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) {
+                            return 'Please select a host';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter purpose of visit';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: 20),
-
-                // Host Selection
-                DropdownButtonFormField<String>(
-                  style: TextStyle(color: Colors.grey[100]),
-                  dropdownColor: Colors.grey[850],
-                  decoration: InputDecoration(
-                    labelText: 'Host/Person to Meet *',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.work, color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[600]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.blue),
-                    ),
-                  ),
-                  value: _selectedHostId,
-                  items: _hosts.map((host) {
-                    return DropdownMenuItem<String>(
-                      value: host['id'],
-                      child: Text(host['name']!),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedHostId = value;
-                      _selectedHostName = _hosts
-                          .firstWhere((host) => host['id'] == value)['name'];
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a host';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 30),
-
+                const SizedBox(height: 24),
+                
                 // Submit Button
                 SizedBox(
+                  width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _submitForm,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[800]!,
+                      backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      elevation: 4,
                     ),
                     child: _isLoading
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.grey[300]!),
-                            ),
-                          )
+                        ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(
-                            'COMPLETE CHECK-IN',
+                            'Generate QR Code',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
                             ),
                           ),
                   ),
