@@ -63,13 +63,13 @@ class DashboardScreen extends StatelessWidget {
                 'Visitor List',
                 const VisitorListScreen(),
               ),
-            if (role == 'admin' || role == 'receptionist')
-              _buildDashboardItem(
-                context,
-                Icons.exit_to_app,
-                'Check-out',
-                const CheckoutScreen(),
-              ),
+            // Checkout button for all roles (admin, receptionist, visitor)
+            _buildDashboardItem(
+              context,
+              Icons.exit_to_app,
+              'Check-out',
+              const CheckoutScreen(),
+            ),
             if (role == 'guard' || role == 'admin')
               _buildDashboardItem(
                 context,
@@ -105,6 +105,14 @@ class DashboardScreen extends StatelessWidget {
               'Self Register',
               const VisitorSelfRegisterScreen(),
             ),
+            // Add visitor list for visitors to see their own visits
+            if (role == 'visitor')
+              _buildDashboardItem(
+                context,
+                Icons.list_alt,
+                'My Visits',
+                const VisitorListScreen(),
+              ),
           ],
         ),
       ),
@@ -119,7 +127,7 @@ class DashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey[800]!.withOpacity(0.3),
+            color: Colors.grey[800]!.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

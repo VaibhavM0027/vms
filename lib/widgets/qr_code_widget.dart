@@ -27,7 +27,7 @@ class CustomQRCodeWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -47,7 +47,6 @@ class CustomQRCodeWidget extends StatelessWidget {
         version: QrVersions.auto,
         size: size,
         backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
         errorCorrectionLevel: QrErrorCorrectLevel.M,
         padding: const EdgeInsets.all(16),
         gapless: true,
@@ -56,6 +55,14 @@ class CustomQRCodeWidget extends StatelessWidget {
         embeddedImageEmitsError: false,
         constrainErrorBounds: true,
         semanticsLabel: 'QR Code for $data',
+        eyeStyle: QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: foregroundColor,
+        ),
+        dataModuleStyle: QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: foregroundColor,
+        ),
       );
     } catch (e) {
       // Fallback if QR generation fails
@@ -85,7 +92,7 @@ class CustomQRCodeWidget extends StatelessWidget {
             Text(
               'ID: ${data.substring(0, 8).toUpperCase()}',
               style: TextStyle(
-                color: foregroundColor.withOpacity(0.7),
+                color: foregroundColor.withValues(alpha: 0.7),
                 fontSize: 10,
               ),
               textAlign: TextAlign.center,
@@ -124,7 +131,7 @@ class QRCodeDialog extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -179,7 +186,7 @@ class QRCodeDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
                   ),

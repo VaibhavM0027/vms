@@ -11,7 +11,7 @@ class VisitorListScreen extends StatefulWidget {
   const VisitorListScreen({super.key});
 
   @override
-  _VisitorListScreenState createState() => _VisitorListScreenState();
+  State<VisitorListScreen> createState() => _VisitorListScreenState();
 }
 
 class _VisitorListScreenState extends State<VisitorListScreen> {
@@ -19,6 +19,13 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
   String _filterStatus = 'all';
   bool _showCheckedOut = false;
   String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +44,11 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
           ),
           PopupMenuButton<String>(
             icon: Icon(Icons.filter_list, color: Colors.grey[100]),
-            onSelected: (value) => setState(() => _filterStatus = value),
+            onSelected: (value) {
+              setState(() {
+                _filterStatus = value;
+              });
+            },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'all', child: Text('All')),
               const PopupMenuItem(value: 'pending', child: Text('Pending')),
@@ -72,6 +83,7 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
         ),
         child: Column(
           children: [
+            // Search Bar
             if (_searchQuery.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(16),
@@ -79,6 +91,7 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                   children: [
                     Expanded(
                       child: TextField(
+                        controller: _searchController,
                         style: TextStyle(color: Colors.grey[100]),
                         decoration: InputDecoration(
                           hintText: 'Search visitors...',
@@ -86,7 +99,12 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                           prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
                           suffixIcon: IconButton(
                             icon: Icon(Icons.clear, color: Colors.grey[400]),
-                            onPressed: () => setState(() => _searchQuery = ''),
+                            onPressed: () {
+                              setState(() {
+                                _searchQuery = '';
+                                _searchController.clear();
+                              });
+                            },
                           ),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
@@ -96,6 +114,7 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                   ],
                 ),
               ),
+            // Filter Display
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -153,7 +172,7 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                         decoration: BoxDecoration(
                           color: Colors.grey[850]!,
                           borderRadius: BorderRadius.circular(12),
-                          boxShadow: [BoxShadow(color: Colors.grey[800]!.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))],
+                          boxShadow: [BoxShadow(color: Colors.grey[800]!.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))],
                         ),
                         child: Material(
                           color: Colors.transparent,
@@ -161,62 +180,84 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                             borderRadius: BorderRadius.circular(12),
                             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VisitorDetailsScreen(visitor: visitor))),
                             child: Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(12),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // Header row with name and status
                                   Row(
                                     children: [
-                                      Expanded(child: Text(visitor.name, style: TextStyle(color: Colors.grey[100]!, fontSize: 18, fontWeight: FontWeight.w600))),
+                                      Expanded(
+                                        child: Text(
+                                          visitor.name, 
+                                          style: TextStyle(color: Colors.grey[100]!, fontSize: 16, fontWeight: FontWeight.w600),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
                                       _buildStatusChip(visitor.status),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  _buildInfoRow(Icons.phone, 'Contact: ${visitor.contact}'),
-                                  _buildInfoRow(Icons.email, 'Email: ${visitor.email}'),
-                                  _buildInfoRow(Icons.work, 'Host: ${visitor.hostName}'),
-                                  _buildInfoRow(Icons.description, 'Purpose: ${visitor.purpose}'),
-                                  _buildInfoRow(Icons.calendar_today, 'Visit Date: ${DateFormat('MMM dd, yyyy').format(visitor.visitDate)}'),
-                                  _buildInfoRow(Icons.access_time, 'Check-in: ${DateFormat('MMM dd, yyyy HH:mm').format(visitor.checkIn)}'),
+                                  const SizedBox(height: 8),
+                                  
+                                  // Compact info rows
+                                  _buildCompactInfoRow(Icons.phone, visitor.contact),
+                                  _buildCompactInfoRow(Icons.email, visitor.email),
+                                  _buildCompactInfoRow(Icons.work, visitor.hostName),
+                                  _buildCompactInfoRow(Icons.description, visitor.purpose),
+                                  _buildCompactInfoRow(Icons.calendar_today, DateFormat('MMM dd, yyyy').format(visitor.visitDate)),
+                                  _buildCompactInfoRow(Icons.access_time, DateFormat('MMM dd, yyyy HH:mm').format(visitor.checkIn)),
                                   if (visitor.checkOut != null)
-                                    _buildInfoRow(Icons.exit_to_app, 'Check-out: ${DateFormat('MMM dd, yyyy HH:mm').format(visitor.checkOut!)}'),
-                                  const SizedBox(height: 12),
+                                    _buildCompactInfoRow(Icons.exit_to_app, DateFormat('MMM dd, yyyy HH:mm').format(visitor.checkOut!)),
+                                  
+                                  const SizedBox(height: 8),
+                                  
+                                  // Action buttons with better spacing
                                   Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
+                                    spacing: 6,
+                                    runSpacing: 6,
                                     children: [
                                       if (visitor.status == 'pending' && (role == 'admin' || role == 'host'))
-                                        ElevatedButton.icon(
-                                          onPressed: () => _approveVisitor(visitor.id!),
-                                          icon: Icon(Icons.check, size: 16),
-                                          label: Text('Approve'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green[700], 
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        SizedBox(
+                                          height: 32,
+                                          child: ElevatedButton.icon(
+                                            onPressed: () => _approveVisitor(visitor.id!),
+                                            icon: const Icon(Icons.check, size: 14),
+                                            label: const Text('Approve', style: TextStyle(fontSize: 12)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.green[700], 
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            ),
                                           ),
                                         ),
                                       if (visitor.status == 'pending' && (role == 'admin' || role == 'host'))
-                                        ElevatedButton.icon(
-                                          onPressed: () => _rejectVisitor(visitor.id!),
-                                          icon: Icon(Icons.close, size: 16),
-                                          label: Text('Reject'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red[700], 
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        SizedBox(
+                                          height: 32,
+                                          child: ElevatedButton.icon(
+                                            onPressed: () => _rejectVisitor(visitor.id!),
+                                            icon: const Icon(Icons.close, size: 14),
+                                            label: const Text('Reject', style: TextStyle(fontSize: 12)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red[700], 
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            ),
                                           ),
                                         ),
-                                      // Show checkout button for visitors who have QR codes and are checked in
                                       if (_canCheckOut(visitor, role))
-                                        ElevatedButton.icon(
-                                          onPressed: () => _checkOutVisitor(visitor),
-                                          icon: Icon(Icons.exit_to_app, size: 16),
-                                          label: Text('Check-out'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.blue[700], 
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        SizedBox(
+                                          height: 32,
+                                          child: ElevatedButton.icon(
+                                            onPressed: () => _checkOutVisitor(visitor),
+                                            icon: const Icon(Icons.exit_to_app, size: 14),
+                                            label: const Text('Check-out', style: TextStyle(fontSize: 12)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.blue[700], 
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            ),
                                           ),
                                         ),
                                     ],
@@ -241,7 +282,18 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
   Stream<List<Visitor>> _getVisitorsStream(String role) {
     if (role == 'admin') {
       return _firebaseServices.getAllVisitors();
+    } else if (role == 'visitor') {
+      // For visitors, show their own visits based on contact number
+      final currentUserContact = _getCurrentUserContact();
+      if (currentUserContact.isNotEmpty) {
+        return _firebaseServices.getAllVisitors().map((visitors) => 
+          visitors.where((visitor) => visitor.contact == currentUserContact).toList()
+        );
+      } else {
+        return Stream.value([]);
+      }
     } else {
+      // For hosts and other roles, show visitors by host
       final hostId = _firebaseServices.getCurrentUserId();
       return hostId != null ? _firebaseServices.getVisitorsByHost(hostId) : Stream.value([]);
     }
@@ -249,8 +301,17 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
 
   List<Visitor> _filterVisitors(List<Visitor> visitors) {
     return visitors.where((visitor) {
-      if (_filterStatus != 'all' && visitor.status != _filterStatus) return false;
-      if (!_showCheckedOut && visitor.checkOut != null) return false;
+      // Status filter
+      if (_filterStatus != 'all' && visitor.status != _filterStatus) {
+        return false;
+      }
+      
+      // Checked out filter
+      if (!_showCheckedOut && visitor.checkOut != null) {
+        return false;
+      }
+      
+      // Search filter
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         return visitor.name.toLowerCase().contains(query) ||
@@ -259,6 +320,7 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                visitor.hostName.toLowerCase().contains(query) ||
                visitor.purpose.toLowerCase().contains(query);
       }
+      
       return true;
     }).toList();
   }
@@ -275,14 +337,21 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
     }
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
+  Widget _buildCompactInfoRow(IconData icon, String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: Colors.grey[400]),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: TextStyle(color: Colors.grey[300], fontSize: 14))),
+          Icon(icon, size: 14, color: Colors.grey[400]),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text, 
+              style: TextStyle(color: Colors.grey[300], fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -326,23 +395,17 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: chipColor, borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: chipColor, borderRadius: BorderRadius.circular(8)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(statusIcon, size: 14, color: Colors.white),
-        const SizedBox(width: 4),
-        Text(statusText, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+        Icon(statusIcon, size: 12, color: Colors.white),
+        const SizedBox(width: 2),
+        Text(statusText, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500)),
       ]),
     );
   }
 
   bool _canCheckOut(Visitor visitor, String role) {
-    // Allow checkout for visitors who:
-    // 1. Have a QR code (meaning they were registered)
-    // 2. Are not already checked out
-    // 3. Are either approved, checked-in, or pending (for self-registered visitors)
-    // 4. User has appropriate role (admin, receptionist, or the visitor themselves)
-    
     if (visitor.checkOut != null) return false; // Already checked out
     
     final hasValidStatus = ['approved', 'checked-in', 'pending'].contains(visitor.status);
@@ -354,9 +417,9 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
   }
 
   String _getCurrentUserContact() {
-    // This would need to be implemented based on your auth system
-    // For now, returning empty string
-    return '';
+    // Get current user contact from auth service
+    final authService = Provider.of<AuthService>(context, listen: false);
+    return authService.username ?? '';
   }
 
   void _showSearchDialog() {
@@ -366,6 +429,7 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
         backgroundColor: Colors.grey[850],
         title: Text('Search Visitors', style: TextStyle(color: Colors.grey[100])),
         content: TextField(
+          controller: _searchController,
           style: TextStyle(color: Colors.grey[100]),
           decoration: InputDecoration(
             hintText: 'Enter search term...',
@@ -375,8 +439,20 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
           onChanged: (value) => setState(() => _searchQuery = value),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: Colors.grey[400]))),
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Search', style: TextStyle(color: Colors.blue[300]))),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                _searchQuery = '';
+                _searchController.clear();
+              });
+            }, 
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[400]))
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: Text('Search', style: TextStyle(color: Colors.blue[300]))
+          ),
         ],
       ),
     );
@@ -385,18 +461,34 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
   void _approveVisitor(String visitorId) async {
     try {
       await _firebaseServices.approveVisitor(visitorId);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Visitor approved successfully'), backgroundColor: Colors.green[700]));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Visitor approved successfully'), backgroundColor: Colors.green[700])
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to approve visitor: $e'), backgroundColor: Colors.red[700]));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to approve visitor: $e'), backgroundColor: Colors.red[700])
+        );
+      }
     }
   }
 
   void _rejectVisitor(String visitorId) async {
     try {
       await _firebaseServices.rejectVisitor(visitorId);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Visitor rejected'), backgroundColor: Colors.red[700]));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Visitor rejected'), backgroundColor: Colors.red[700])
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to reject visitor: $e'), backgroundColor: Colors.red[700]));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to reject visitor: $e'), backgroundColor: Colors.red[700])
+        );
+      }
     }
   }
 

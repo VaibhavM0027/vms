@@ -1,11 +1,8 @@
 import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '../widgets/qr_code_widget.dart';
 
 class VisitorSelfRegisterScreen extends StatefulWidget {
@@ -20,10 +17,12 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
   final _nameController = TextEditingController();
   final _contactController = TextEditingController();
   final _emailController = TextEditingController();
+  final _hostNameController = TextEditingController();
   final _purposeController = TextEditingController();
   File? _photo;
   final ImagePicker _picker = ImagePicker();
   bool _isSubmitting = false;
+  String? _lastGeneratedQR; // Store the last generated QR code
 
   Future<void> _pickPhoto() async {
     try {
@@ -59,9 +58,9 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
         'name': _nameController.text.trim(),
         'contact': _contactController.text.trim(),
         'email': _emailController.text.trim(),
+        'hostName': _hostNameController.text.trim(),
         'purpose': _purposeController.text.trim(),
         'hostId': '',
-        'hostName': '',
         'visitDate': now,
         'checkIn': now,
         'checkOut': null,
@@ -76,7 +75,10 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
 
       if (!mounted) return;
 
-      setState(() => _isSubmitting = false);
+      setState(() {
+        _isSubmitting = false;
+        _lastGeneratedQR = docRef.id; // Store the QR code
+      });
       _showQRCodeDialog(docRef.id);
 
       () async {
@@ -105,9 +107,9 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.grey[850],
-        title: Text(
+        title: const Text(
           'Registration Successful!',
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -161,15 +163,34 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
   void _showCheckoutOption(String qrData) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.grey[850],
         title: const Text(
           'Checkout Option',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        content: Text(
-          'Would you like to check out now or later? You can always check out from the visitors list.',
-          style: TextStyle(color: Colors.grey[300]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.exit_to_app,
+              size: 48,
+              color: Colors.blue[300],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Would you like to check out now or later?',
+              style: TextStyle(color: Colors.grey[300], fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You can always check out from the main dashboard.',
+              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -179,7 +200,7 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
             },
             child: Text(
               'Later',
-              style: TextStyle(color: Colors.grey[400]),
+              style: TextStyle(color: Colors.grey[400], fontSize: 16),
             ),
           ),
           ElevatedButton(
@@ -190,8 +211,12 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue[700],
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            child: const Text('Checkout Now'),
+            child: const Text(
+              'Checkout Now',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -211,6 +236,15 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
         backgroundColor: Colors.black,
         elevation: 0,
       ),
+      floatingActionButton: _lastGeneratedQR != null
+          ? FloatingActionButton.extended(
+              onPressed: () => _navigateToCheckout(_lastGeneratedQR!),
+              backgroundColor: Colors.blue[700],
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.exit_to_app),
+              label: const Text('Checkout'),
+            )
+          : null,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -234,7 +268,7 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey[800]!.withOpacity(0.3),
+                        color: Colors.grey[800]!.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       )
@@ -270,7 +304,7 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey[800]!.withOpacity(0.3),
+                        color: Colors.grey[800]!.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       )
@@ -344,7 +378,7 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey[800]!.withOpacity(0.3),
+                        color: Colors.grey[800]!.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       )
@@ -463,6 +497,34 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
                       ),
                       const SizedBox(height: 16),
 
+                      // Host Name Field
+                      TextFormField(
+                        controller: _hostNameController,
+                        style: TextStyle(color: Colors.grey[100]),
+                        decoration: InputDecoration(
+                          labelText: 'Host Name *',
+                          labelStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: Icon(Icons.person_pin, color: Colors.grey[400]),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[600]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter the host name';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
                       // Purpose Field
                       TextFormField(
                         controller: _purposeController,
@@ -532,6 +594,7 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
     _nameController.dispose();
     _contactController.dispose();
     _emailController.dispose();
+    _hostNameController.dispose();
     _purposeController.dispose();
     super.dispose();
   }
