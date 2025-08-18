@@ -7,8 +7,12 @@ import 'guard_scan_screen.dart';
 import 'settings_screen.dart';
 import 'host_approval_screen.dart';
 import 'visitor_self_register_screen.dart';
+import 'host_management_screen.dart';
+import 'notifications_screen.dart';
+import 'user_registration_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import 'pre_register_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -16,13 +20,73 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final role = Provider.of<AuthService>(context).role ?? 'admin';
+    final auth = Provider.of<AuthService>(context);
+    final role = auth.role ?? 'admin';
+    final userId = auth.user?.uid;
+    
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Visitor Management'),
         backgroundColor: Colors.black,
         elevation: 0,
+        actions: [
+          // Notification icon with badge
+          if (userId != null)
+            StreamBuilder<int>(
+              stream: NotificationService().getUnreadCount(userId),
+              builder: (context, snapshot) {
+                final unreadCount = snapshot.data ?? 0;
+                return Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                        );
+                      },
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          // Logout button
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              auth.signOut();
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+            tooltip: 'Logout',
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -90,6 +154,20 @@ class DashboardScreen extends StatelessWidget {
                 Icons.analytics,
                 'Reports',
                 const ReportsScreen(),
+              ),
+            if (role == 'admin')
+              _buildDashboardItem(
+                context,
+                Icons.people_alt,
+                'Host Management',
+                const HostManagementScreen(),
+              ),
+            if (role == 'admin')
+              _buildDashboardItem(
+                context,
+                Icons.person_add_alt,
+                'Add User',
+                const UserRegistrationScreen(),
               ),
             if (role == 'admin')
               _buildDashboardItem(

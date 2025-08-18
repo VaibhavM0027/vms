@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/visitor_service.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../models/visitor_model.dart';
-import '../widgets/qr_code_widget.dart';
+import '../services/visitor_service.dart';
+import '../models/host_model.dart';
+import '../services/host_service.dart';
+import '../utils/validation_helper.dart';
 
 class VisitorRegistrationScreen extends StatefulWidget {
   final String? idImagePath;
@@ -15,6 +18,7 @@ class VisitorRegistrationScreen extends StatefulWidget {
 
 class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
   final FirebaseServices _firebaseServices = FirebaseServices();
+  final HostService _hostService = HostService();
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _contactController = TextEditingController();
@@ -22,7 +26,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
   final _purposeController = TextEditingController();
   String? _selectedHostId;
   String? _selectedHostName;
-  List<Map<String, String>> _hosts = [];
+  List<Host> _hosts = [];
   bool _isLoading = false;
 
   @override
@@ -33,28 +37,21 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
 
   Future<void> _loadHosts() async {
     try {
-      // In a real app, fetch hosts from Firestore
-      setState(() {
-        _hosts = [
-          {
-            'id': 'host_marketing_001',
-            'name': 'Sarah Johnson - Marketing Director'
-          },
-          {'id': 'host_hr_002', 'name': 'Michael Chen - HR Manager'},
-          {'id': 'host_it_003', 'name': 'David Rodriguez - IT Lead'},
-          {'id': 'host_finance_004', 'name': 'Lisa Thompson - Finance Manager'},
-          {
-            'id': 'host_operations_005',
-            'name': 'Robert Kim - Operations Director'
-          },
-          {'id': 'host_sales_006', 'name': 'Jennifer Davis - Sales Manager'},
-        ];
+      // Listen to active hosts from Firestore
+      _hostService.getAllActiveHosts().listen((hosts) {
+        if (mounted) {
+          setState(() {
+            _hosts = hosts;
+          });
+        }
       });
-          } catch (e) {
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading hosts: $e')),
         );
       }
+    }
   }
 
   Future<void> _submitForm() async {
@@ -151,7 +148,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                   ),
                   child: Column(
                     children: [
-                      Icon(Icons.person_add, size: 48, color: Colors.grey[300]),
+                      Icon(Icons.person_add, size: 32, color: Colors.grey[300]),
                       const SizedBox(height: 16),
                       Text(
                         'Register New Visitor',
@@ -161,6 +158,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                       Text(
                         'Enter visitor details to generate QR code',
                         style: TextStyle(fontSize: 16, color: Colors.grey[400]),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -203,11 +201,9 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                             borderSide: BorderSide(color: Colors.grey[300]!),
                           ),
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter visitor name';
-                          }
-                          return null;
+                        validator: ValidationHelper.validateName,
+                        onChanged: (value) {
+                          _nameController.text = ValidationHelper.sanitizeInput(value);
                         },
                       ),
                       const SizedBox(height: 16),
@@ -317,9 +313,9 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                         dropdownColor: Colors.grey[850],
                         items: _hosts.map((host) {
                           return DropdownMenuItem<String>(
-                            value: host['id'],
+                            value: host.id,
                             child: Text(
-                              host['name']!,
+                              '${host.name} - ${host.department}',
                               style: TextStyle(color: Colors.grey[100]),
                             ),
                           );
@@ -327,7 +323,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                         onChanged: (value) {
                           setState(() {
                             _selectedHostId = value;
-                            _selectedHostName = _hosts.firstWhere((host) => host['id'] == value)['name'];
+                            _selectedHostName = _hosts.firstWhere((host) => host.id == value).name;
                           });
                         },
                         validator: (value) {
@@ -381,5 +377,161 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
     _emailController.dispose();
     _purposeController.dispose();
     super.dispose();
+  }
+}
+
+class QRCodeDialog extends StatelessWidget {
+  final String qrData;
+  final String visitorName;
+  final String visitorContact;
+  final String visitorPurpose;
+  final VoidCallback onDone;
+
+  const QRCodeDialog({
+    super.key,
+    required this.qrData,
+    required this.visitorName,
+    required this.visitorContact,
+    required this.visitorPurpose,
+    required this.onDone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.grey[850],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(Icons.qr_code, color: Colors.grey[300], size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  'Visitor QR Code',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[100],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Visitor Info
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Visitor Details',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[300],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(Icons.person, 'Name', visitorName),
+                  const SizedBox(height: 8),
+                  _buildInfoRow(Icons.phone, 'Contact', visitorContact),
+                  const SizedBox(height: 8),
+                  _buildInfoRow(Icons.description, 'Purpose', visitorPurpose),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // QR Code
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: QrImageView(
+                data: qrData,
+                version: QrVersions.auto,
+                size: 200.0,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            Text(
+              'Show this QR code to the guard for entry',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[400],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            
+            // Done Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onDone,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Done',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[400]),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[400],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[200],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

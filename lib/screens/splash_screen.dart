@@ -1,5 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
+import 'dashboard_screen.dart';
+import 'guard_scan_screen.dart';
+import 'visitor_self_register_screen.dart';
+import 'host_approval_screen.dart';
+import '../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,16 +20,58 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigateToLogin();
+    _checkAuthState();
   }
 
-  _navigateToLogin() async {
+  Future<void> _checkAuthState() async {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-    );
+
+    try {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null && auth.isAuthenticated && auth.role != null) {
+        // User is already logged in with valid role, navigate to appropriate screen
+        Widget nextScreen;
+        switch (auth.role) {
+          case 'guard':
+            nextScreen = const GuardScanScreen();
+            break;
+          case 'visitor':
+            nextScreen = const VisitorSelfRegisterScreen();
+            break;
+          case 'host':
+            nextScreen = const HostApprovalScreen();
+            break;
+          case 'admin':
+          case 'receptionist':
+          default:
+            nextScreen = const DashboardScreen();
+        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => nextScreen),
+        );
+      } else {
+        // No user logged in or missing role, go to login screen
+        if (currentUser != null) {
+          // Sign out user if they don't have proper role data
+          await FirebaseAuth.instance.signOut();
+        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error in splash screen auth check: $e');
+      // On error, go to login screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    }
   }
 
   @override

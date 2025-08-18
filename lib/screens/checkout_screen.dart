@@ -30,6 +30,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _checkoutVisitor(Visitor visitor) async {
     try {
+      // Check if visitor can be checked out
+      if (visitor.checkOut != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Visitor already checked out'), backgroundColor: Colors.orange[700]),
+        );
+        return;
+      }
+
+      if (visitor.status == 'rejected') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Cannot checkout rejected visitor'), backgroundColor: Colors.red[700]),
+        );
+        return;
+      }
+
       await _firebaseServices.checkOutVisitor(visitor.id!, _notesController.text);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Visitor checked out successfully'), backgroundColor: Colors.green[700]),

@@ -246,6 +246,20 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                                             ),
                                           ),
                                         ),
+                                      if (visitor.status == 'approved' && (role == 'admin' || role == 'receptionist' || role == 'guard'))
+                                        SizedBox(
+                                          height: 32,
+                                          child: ElevatedButton.icon(
+                                            onPressed: () => _checkInVisitor(visitor.id!),
+                                            icon: const Icon(Icons.login, size: 14),
+                                            label: const Text('Check-in', style: TextStyle(fontSize: 12)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.blue[700], 
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            ),
+                                          ),
+                                        ),
                                       if (_canCheckOut(visitor, role))
                                         SizedBox(
                                           height: 32,
@@ -254,7 +268,7 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                                             icon: const Icon(Icons.exit_to_app, size: 14),
                                             label: const Text('Check-out', style: TextStyle(fontSize: 12)),
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.blue[700], 
+                                              backgroundColor: Colors.orange[700], 
                                               foregroundColor: Colors.white,
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                             ),
@@ -408,12 +422,15 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
   bool _canCheckOut(Visitor visitor, String role) {
     if (visitor.checkOut != null) return false; // Already checked out
     
+    // Allow checkout for approved, checked-in, and pending visitors
     final hasValidStatus = ['approved', 'checked-in', 'pending'].contains(visitor.status);
-    final hasQRCode = visitor.qrCode != null && visitor.qrCode!.isNotEmpty;
+    
+    // Check permissions based on role
     final hasPermission = role == 'admin' || role == 'receptionist' || 
+                         (role == 'host' && visitor.hostId == _firebaseServices.getCurrentUserId()) ||
                          (role == 'visitor' && visitor.contact == _getCurrentUserContact());
     
-    return hasValidStatus && hasQRCode && hasPermission;
+    return hasValidStatus && hasPermission;
   }
 
   String _getCurrentUserContact() {
@@ -487,6 +504,23 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to reject visitor: $e'), backgroundColor: Colors.red[700])
+        );
+      }
+    }
+  }
+
+  void _checkInVisitor(String visitorId) async {
+    try {
+      await _firebaseServices.checkInVisitor(visitorId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Visitor checked in successfully'), backgroundColor: Colors.blue[700])
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to check in visitor: $e'), backgroundColor: Colors.red[700])
         );
       }
     }

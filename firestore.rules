@@ -4,29 +4,58 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
     function hasRole(role) {
-      return isSignedIn() && role in request.auth.token.roles;
+      return isSignedIn() && getUserRole() == role;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'admin';
     }
 
     match /visitors/{visitorId} {
-      // Admin full access
-      allow read, write: if hasRole('admin');
+      // Admin and receptionist full access
+      allow read, write: if isAdmin() || (isSignedIn() && getUserRole() == 'receptionist');
 
-      // Visitor: can create own registration (public kiosk) - optional, keep restricted if required
-      allow read: if hasRole('visitor') || hasRole('guard');
-      allow create: if hasRole('visitor');
-      allow update: if hasRole('visitor') &&
-        (request.resource.data.diff(resource.data).changedKeys().hasOnly(['status','checkOut','meetingNotes','checkIn']));
+      // Visitor: can create own registration and read/update own records
+      allow read, create: if true; // Allow public visitor registration
+      allow update: if isSignedIn() && 
+        (getUserRole() == 'visitor' || getUserRole() == 'guard' || getUserRole() == 'host');
 
-      // Guard: can update checkIn on approved visitors
-      allow update: if hasRole('guard') &&
-        request.resource.data.status == resource.data.status &&
-        request.resource.data.checkIn != resource.data.checkIn;
+      // Guard: can update checkIn/checkOut
+      allow update: if isSignedIn() && getUserRole() == 'guard';
+      
+      // Host: can approve/reject visitors
+      allow update: if isSignedIn() && getUserRole() == 'host';
     }
 
     match /users/{userId} {
-      allow read: if hasRole('admin');
-      allow write: if false;
+      // Allow reading user documents for authenticated users
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Allow user creation during registration (authenticated users can create their profile)
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      
+      // Allow admin to create any user
+      allow create: if isAdmin();
+      
+      // Allow users to update their own profile or admin to update any
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Only admin can delete users
+      allow delete: if isAdmin();
+    }
+
+    match /hosts/{hostId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /visits/{visitId} {
+      allow read, write: if isSignedIn();
     }
   }
 }
