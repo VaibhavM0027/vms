@@ -6,7 +6,8 @@ service cloud.firestore {
     }
     
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ?
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : null;
     }
     
     function hasRole(role) {
@@ -15,6 +16,10 @@ service cloud.firestore {
     
     function isAdmin() {
       return isSignedIn() && getUserRole() == 'admin';
+    }
+    
+    function canCreateUserProfile() {
+      return isSignedIn() && !exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
     match /visitors/{visitorId} {
@@ -39,6 +44,9 @@ service cloud.firestore {
       
       // Allow user creation during registration (authenticated users can create their profile)
       allow create: if isSignedIn() && request.auth.uid == userId;
+      
+      // Allow profile creation for missing user documents during login
+      allow create: if canCreateUserProfile() && request.auth.uid == userId;
       
       // Allow admin to create any user
       allow create: if isAdmin();

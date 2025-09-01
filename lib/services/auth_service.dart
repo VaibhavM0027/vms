@@ -124,12 +124,12 @@ class AuthService extends ChangeNotifier {
 
             if (_role == null) {
               await _auth.signOut();
-              return 'Unable to load user profile. Please contact administrator.';
+              return 'Unable to load user profile. Your account may need to be set up by an administrator. Please contact support.';
             }
           } catch (profileError) {
             debugPrint('Failed to create user profile: $profileError');
             await _auth.signOut();
-            return 'User profile error. Please contact administrator.';
+            return 'Account setup failed. Please try again or contact administrator if the problem persists.';
           }
         }
 
@@ -177,31 +177,61 @@ class AuthService extends ChangeNotifier {
   Future<void> _createMissingUserProfile(User user) async {
     try {
       debugPrint('Creating missing user profile for: ${user.uid}');
+      
+      // Check if document already exists but has invalid data
+      final existingDoc = await _firestore.collection('users').doc(user.uid).get();
+      
       final userData = <String, dynamic>{
         'email': user.email ?? '',
         'username': user.displayName ?? user.email?.split('@')[0] ?? 'User',
         'role': 'admin', // Default role for missing profiles
         'department': null,
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': existingDoc.exists && existingDoc.data() != null && existingDoc.data()!['createdAt'] != null 
+            ? existingDoc.data()!['createdAt'] 
+            : FieldValue.serverTimestamp(),
         'isActive': true,
         'profileCreated': 'auto-generated',
         'uid': user.uid,
+        'lastUpdated': FieldValue.serverTimestamp(),
       };
 
-      await _firestore.collection('users').doc(user.uid).set(
-        userData,
-        SetOptions(merge: true),
-      );
-
-      // Verify the document was created
-      final verifyDoc = await _firestore.collection('users').doc(user.uid).get();
-      if (!verifyDoc.exists) {
-        throw Exception('Failed to verify user profile creation');
+      // Use multiple attempts with exponential backoff
+      int attempts = 0;
+      const maxAttempts = 5;
+      
+      while (attempts < maxAttempts) {
+        try {
+          await _firestore.collection('users').doc(user.uid).set(
+            userData,
+            SetOptions(merge: true),
+          );
+          
+          // Wait a moment for Firestore to process
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // Verify the document was created with proper data
+          final verifyDoc = await _firestore.collection('users').doc(user.uid).get();
+          if (verifyDoc.exists) {
+            final data = verifyDoc.data();
+            if (data != null && data['role'] != null && data['email'] != null) {
+              debugPrint('Missing user profile created successfully with role: ${data['role']}');
+              return; // Success
+            }
+          }
+          
+          throw Exception('Document created but verification failed');
+        } catch (e) {
+          attempts++;
+          debugPrint('Attempt $attempts failed: $e');
+          if (attempts >= maxAttempts) {
+            rethrow;
+          }
+          // Exponential backoff
+          await Future.delayed(Duration(milliseconds: 1000 * attempts));
+        }
       }
-
-      debugPrint('Missing user profile created successfully');
     } catch (e) {
-      debugPrint('Error creating missing user profile: $e');
+      debugPrint('Error creating missing user profile after all attempts: $e');
       rethrow;
     }
   }
