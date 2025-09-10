@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,12 @@ class NotificationService {
 
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
+
+  // Track listeners and status to prevent duplicates and detect transitions
+  bool _adminListenersStarted = false;
+  final Map<String, String> _visitorStatusCache = {};
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _pendingListener;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _completedListener;
 
   Future<void> initialize() async {
     // Request permission for notifications
@@ -116,7 +123,7 @@ class NotificationService {
     );
 
     await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      0,
       title,
       body,
       details,
@@ -231,64 +238,41 @@ class NotificationService {
   // Mark notification as read
   Future<void> markAsRead(String notificationId) async {
     try {
-      await _firestore
-          .collection('notifications')
-          .doc(notificationId)
-          .update({'read': true});
+      await _firestore.collection('notifications').doc(notificationId).update({'read': true});
     } catch (e) {
       throw Exception('Failed to mark notification as read: $e');
     }
   }
 
-  // Mark all notifications as read for a user
+  // Mark all user notifications as read
   Future<void> markAllAsRead(String userId) async {
-    try {
-      final batch = _firestore.batch();
-      final notifications = await _firestore
-          .collection('notifications')
-          .where('userId', isEqualTo: userId)
-          .where('read', isEqualTo: false)
-          .get();
-
-      for (final doc in notifications.docs) {
-        batch.update(doc.reference, {'read': true});
-      }
-
-      await batch.commit();
-    } catch (e) {
-      throw Exception('Failed to mark all notifications as read: $e');
-    }
-  }
-
-  // Get unread notification count
-  Stream<int> getUnreadCount(String userId) {
-    return _firestore
+    final query = await _firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .where('read', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
-  }
+        .get();
 
-  // Delete notification
-  Future<void> deleteNotification(String notificationId) async {
-    try {
-      await _firestore.collection('notifications').doc(notificationId).delete();
-    } catch (e) {
-      throw Exception('Failed to delete notification: $e');
+    final batch = _firestore.batch();
+    for (final doc in query.docs) {
+      batch.update(doc.reference, {'read': true});
     }
+    await batch.commit();
   }
 
-  // Clear all notifications for a user
-  Future<void> clearAllNotifications(String userId) async {
+  // Delete a specific notification
+  Future<void> deleteNotification(String notificationId) async {
+    await _firestore.collection('notifications').doc(notificationId).delete();
+  }
+
+  Future<void> clearAllForUser(String userId) async {
     try {
-      final batch = _firestore.batch();
-      final notifications = await _firestore
+      final query = await _firestore
           .collection('notifications')
           .where('userId', isEqualTo: userId)
           .get();
 
-      for (final doc in notifications.docs) {
+      final batch = _firestore.batch();
+      for (final doc in query.docs) {
         batch.delete(doc.reference);
       }
 
@@ -296,6 +280,89 @@ class NotificationService {
     } catch (e) {
       throw Exception('Failed to clear notifications: $e');
     }
+  }
+
+  // Alias used by notifications_screen.dart
+  Future<void> clearAllNotifications(String userId) => clearAllForUser(userId);
+
+  // Start local pop-up notifications for admins to be alerted on pending approvals and checkouts
+  Future<void> startAdminEventListeners() async {
+    if (_adminListenersStarted) return;
+    _adminListenersStarted = true;
+
+    // Seed cache with current statuses to detect transitions
+    _firestore.collection('visitors').get().then((snapshot) {
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final status = data['status']?.toString() ?? 'pending';
+        _visitorStatusCache[doc.id] = status;
+      }
+    }).catchError((e, st) {
+      debugPrint('Failed to prime status cache: $e');
+      return null;
+    });
+
+    // Listen for newly added pending visitors
+    _pendingListener = _firestore
+        .collection('visitors')
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .listen((snapshot) {
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data();
+          if (data == null) continue;
+          final name = data['name']?.toString() ?? 'Visitor';
+          final purpose = data['purpose']?.toString() ?? '';
+          _showLocalNotification(
+            title: 'Visitor waiting for approval',
+            body: '$name • $purpose',
+            payload: 'visitorId=${change.doc.id}',
+          );
+          _visitorStatusCache[change.doc.id] = 'pending';
+        }
+      }
+    }, onError: (e) {
+      debugPrint('Pending listener error: $e');
+    });
+
+    // Listen for transitions to completed (checkout)
+    _completedListener = _firestore
+        .collection('visitors')
+        .orderBy('checkOut', descending: true)
+        .limit(100)
+        .snapshots()
+        .listen((snapshot) {
+      for (final change in snapshot.docChanges) {
+        final data = change.doc.data();
+        if (data == null) continue;
+        final newStatus = data['status']?.toString();
+        final previousStatus = _visitorStatusCache[change.doc.id];
+        if (newStatus == 'completed' && previousStatus != 'completed') {
+          final name = data['name']?.toString() ?? 'Visitor';
+          _showLocalNotification(
+            title: 'Visitor checked out',
+            body: '$name has checked out.',
+            payload: 'visitorId=${change.doc.id}',
+          );
+        }
+        if (newStatus != null) {
+          _visitorStatusCache[change.doc.id] = newStatus;
+        }
+      }
+    }, onError: (e) {
+      debugPrint('Completed listener error: $e');
+    });
+  }
+
+  Future<void> stopAdminEventListeners() async {
+    await _pendingListener?.cancel();
+    await _completedListener?.cancel();
+    _pendingListener = null;
+    _completedListener = null;
+    _adminListenersStarted = false;
   }
 }
 

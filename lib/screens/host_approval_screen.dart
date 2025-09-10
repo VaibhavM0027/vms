@@ -70,12 +70,29 @@ class _HostApprovalScreenState extends State<HostApprovalScreen> {
               return Card(
                 margin: const EdgeInsets.all(8),
                 child: ListTile(
+                  leading: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                        ? NetworkImage(visitor.photoUrl!)
+                        : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                            ? NetworkImage(visitor.idImageUrl!)
+                            : null,
+                    child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
+                        ? Text(
+                            visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          )
+                        : null,
+                  ),
                   title: Text(visitor.name),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Contact: ${visitor.contact}'),
-                      Text('Purpose: ${visitor.purpose}'),
+                      Text('Contact: ${visitor.contact}')
+                      ,
+                      Text('Purpose: ${visitor.purpose}')
+                      ,
                       Text(
                           'Check-in: ${DateFormat('yyyy-MM-dd HH:mm').format(visitor.checkIn)}'),
                     ],

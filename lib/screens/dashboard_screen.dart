@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import 'pre_register_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -22,67 +23,37 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context);
     final role = auth.role ?? 'admin';
-    final userId = auth.user?.uid;
+
+    // Ensure notification listeners are initialized and start admin event popups
+    NotificationService().initialize();
+    if (role == 'admin') {
+      NotificationService().startAdminEventListeners();
+    } else {
+      NotificationService().stopAdminEventListeners();
+    }
     
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Visitor Management'),
+        title: const Text('VMS Dashboard'),
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
-          // Notification icon with badge
-          if (userId != null)
-            StreamBuilder<int>(
-              stream: NotificationService().getUnreadCount(userId),
-              builder: (context, snapshot) {
-                final unreadCount = snapshot.data ?? 0;
-                return Stack(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.notifications),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                        );
-                      },
-                    ),
-                    if (unreadCount > 0)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            unreadCount > 99 ? '99+' : unreadCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          // Logout button
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              );
+            },
+            tooltip: 'Notifications',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              auth.signOut();
-              Navigator.pushReplacementNamed(context, '/login');
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              Navigator.of(context).popUntil((route) => route.isFirst);
             },
             tooltip: 'Logout',
           ),
@@ -199,58 +170,40 @@ class DashboardScreen extends StatelessWidget {
 
   Widget _buildDashboardItem(
       BuildContext context, IconData icon, String title, Widget screen) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[850]!,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey[800]!.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => screen),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => screen),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800]!,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 40,
-                    color: Colors.grey[300]!,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Colors.grey[100]!,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
-          ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 42, color: Colors.blue[300]),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                color: Colors.grey[100],
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

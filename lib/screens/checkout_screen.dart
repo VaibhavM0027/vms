@@ -16,6 +16,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final FirebaseServices _firebaseServices = FirebaseServices();
   late Stream<List<Visitor>> _visitorsStream;
   final _notesController = TextEditingController();
+  bool _initializedFromRoute = false;
+  bool _loadingRouteVisitor = false;
+  Visitor? _routeVisitor;
 
   @override
   void initState() {
@@ -25,6 +28,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _visitorsStream = _firebaseServices.getVisitorsByHost(hostId);
     } else {
       _visitorsStream = Stream.value([]);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initializedFromRoute) return;
+    _initializedFromRoute = true;
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map && args['qrCode'] is String) {
+      final qr = args['qrCode'] as String;
+      _loadingRouteVisitor = true;
+      _firebaseServices.getVisitorByQRCode(qr).then((visitor) {
+        if (!mounted) return;
+        setState(() {
+          _routeVisitor = visitor;
+          _loadingRouteVisitor = false;
+        });
+      }).catchError((_) {
+        if (!mounted) return;
+        setState(() {
+          _loadingRouteVisitor = false;
+        });
+      });
     }
   }
 
@@ -75,13 +103,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             colors: [Colors.black, Colors.grey[900]!, Colors.black],
           ),
         ),
-        child: widget.visitor != null ? _buildDirectCheckout() : _buildVisitorList(),
+        child: _loadingRouteVisitor
+            ? Center(child: CircularProgressIndicator(color: Colors.grey[300]))
+            : (widget.visitor ?? _routeVisitor) != null
+                ? _buildDirectCheckout()
+                : _buildVisitorList(),
       ),
     );
   }
 
   Widget _buildDirectCheckout() {
-    final visitor = widget.visitor!;
+    final visitor = (widget.visitor ?? _routeVisitor)!;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(

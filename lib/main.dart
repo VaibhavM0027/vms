@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
+import 'screens/checkout_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -150,8 +151,28 @@ class MyApp extends StatelessWidget {
           scaffoldBackgroundColor: Colors.black,
         ),
         home: const SplashScreen(),
+        onGenerateRoute: (settings) {
+          if (settings.name == '/checkout') {
+            return MaterialPageRoute(
+              builder: (context) {
+                return CheckoutRouteWrapper(settings.arguments);
+              },
+            );
+          }
+          return null;
+        },
         debugShowCheckedModeBanner: false,
       ),
     );
+  }
+}
+
+class CheckoutRouteWrapper extends StatelessWidget {
+  final Object? args;
+  const CheckoutRouteWrapper(this.args, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CheckoutScreen();
   }
 }

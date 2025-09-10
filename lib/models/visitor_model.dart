@@ -9,6 +9,7 @@ class Visitor {
   final String hostId;
   final String hostName;
   final String? idImageUrl;
+  final String? photoUrl;
   final DateTime visitDate;
   final DateTime checkIn;
   final DateTime? checkOut;
@@ -25,6 +26,7 @@ class Visitor {
     required this.hostId,
     required this.hostName,
     this.idImageUrl,
+    this.photoUrl,
     required this.visitDate,
     required this.checkIn,
     this.checkOut,
@@ -42,6 +44,7 @@ class Visitor {
       'hostId': hostId,
       'hostName': hostName,
       'idImageUrl': idImageUrl,
+      'photoUrl': photoUrl,
       'visitDate': visitDate,
       'checkIn': checkIn,
       'checkOut': checkOut,
@@ -61,6 +64,7 @@ class Visitor {
       hostId: map['hostId'] ?? '',
       hostName: map['hostName'] ?? '',
       idImageUrl: map['idImageUrl'],
+      photoUrl: map['photoUrl'],
       visitDate: map['visitDate'] != null 
           ? (map['visitDate'] as Timestamp).toDate()
           : DateTime.now(),

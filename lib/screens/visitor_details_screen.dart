@@ -56,12 +56,19 @@ class VisitorDetailsScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     CircleAvatar(
-                      radius: 40,
+                      radius: 48,
                       backgroundColor: Colors.grey[700]!,
-                      child: Text(
-                        visitor.name.substring(0, 1).toUpperCase(),
-                        style: TextStyle(fontSize: 32, color: Colors.grey[100], fontWeight: FontWeight.bold),
-                      ),
+                      backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                          ? NetworkImage(visitor.photoUrl!)
+                          : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                              ? NetworkImage(visitor.idImageUrl!)
+                              : null,
+                      child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
+                          ? Text(
+                              visitor.name.substring(0, 1).toUpperCase(),
+                              style: TextStyle(fontSize: 32, color: Colors.grey[100], fontWeight: FontWeight.bold),
+                            )
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -70,6 +77,18 @@ class VisitorDetailsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     _buildStatusChip(visitor.status),
+                    if ((visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty) || (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)) ...[
+                      const SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty) ? visitor.photoUrl! : visitor.idImageUrl!,
+                          height: 180,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
