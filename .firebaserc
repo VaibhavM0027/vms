@@ -1,0 +1,8 @@
+{
+  "projects": {
+    " firebase deploy --only firestore:indexes": "visitor-management-syste-98ed6",
+    "default": "visitor-management-syste-98ed6"
+  },
+  "targets": {},
+  "etags": {}
+}

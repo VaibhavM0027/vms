@@ -65,6 +65,33 @@ service cloud.firestore {
     match /visits/{visitId} {
       allow read, write: if isSignedIn();
     }
+
+    // Notifications access control
+    match /notifications/{notificationId} {
+      function isNotificationRecipient() {
+        return isSignedIn() && (
+          // notifications may target a specific user
+          resource.data.userId == request.auth.uid ||
+          // or target a host by hostId matching the current user id
+          resource.data.hostId == request.auth.uid
+        );
+      }
+
+      // Read notifications if you are the recipient or you are admin
+      allow get, list: if isAdmin() || isNotificationRecipient();
+
+      // Create notifications allowed to authenticated services/clients; restrict to admins/hosts if needed
+      allow create: if isAdmin() || (isSignedIn() && (getUserRole() == 'host' || getUserRole() == 'receptionist'));
+
+      // Allow marking as read or updating limited fields by recipient or admin
+      allow update: if isAdmin() || (
+        isNotificationRecipient() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['read'])
+      );
+
+      // Admin can delete any; recipient can delete their own
+      allow delete: if isAdmin() || isNotificationRecipient();
+    }
   }
 }
 

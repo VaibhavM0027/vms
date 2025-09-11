@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../services/visitor_service.dart';
 import '../models/visitor_model.dart';
+import '../services/auth_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final Visitor? visitor;
@@ -23,12 +25,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    String? hostId = _firebaseServices.getCurrentUserId();
-    if (hostId != null) {
-      _visitorsStream = _firebaseServices.getVisitorsByHost(hostId);
-    } else {
-      _visitorsStream = Stream.value([]);
-    }
+    // Initialize with an empty stream; will set the correct stream based on role in didChangeDependencies
+    _visitorsStream = Stream.value([]);
   }
 
   @override
@@ -36,6 +34,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.didChangeDependencies();
     if (_initializedFromRoute) return;
     _initializedFromRoute = true;
+
+    // Select stream based on role: Admin/Receptionist see all active visitors; Hosts see their own
+    final role = Provider.of<AuthService>(context, listen: false).role ?? 'admin';
+    final hostId = _firebaseServices.getCurrentUserId();
+    if (role == 'admin' || role == 'receptionist') {
+      _visitorsStream = _firebaseServices.getAllVisitors();
+    } else if (hostId != null) {
+      _visitorsStream = _firebaseServices.getVisitorsByHost(hostId);
+    } else {
+      _visitorsStream = Stream.value([]);
+    }
 
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map && args['qrCode'] is String) {
@@ -217,7 +226,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               }
 
               final visitors = snapshot.data ?? [];
-              final activeVisitors = visitors.where((v) => v.checkOut == null && v.status == 'approved').toList();
+              final activeVisitors = visitors
+                  .where((v) => v.checkOut == null && (v.status == 'approved' || v.status == 'checked-in'))
+                  .toList();
 
               if (activeVisitors.isEmpty) {
                 return Center(
