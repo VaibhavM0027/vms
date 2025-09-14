@@ -195,6 +195,15 @@ class NotificationService {
         'approved': approved,
       },
     );
+
+    // Also show local notification
+    await _showLocalNotification(
+      title: approved ? 'Visit Approved' : 'Visit Rejected',
+      body: approved 
+          ? 'Your visit has been approved. Please proceed to reception.'
+          : 'Your visit request has been rejected. Please contact the host.',
+      payload: visitorId,
+    );
   }
 
   // Send notification to admin about system events
@@ -242,6 +251,35 @@ class NotificationService {
     } catch (e) {
       throw Exception('Failed to mark notification as read: $e');
     }
+  }
+
+  // Start listening for visitor status changes
+  void startVisitorStatusListener(String visitorId) {
+    _firestore
+        .collection('visitors')
+        .doc(visitorId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data()!;
+        final status = data['status'] as String?;
+        
+        if (status != null) {
+          // Check if status changed to approved or rejected
+          if (status == 'approved' || status == 'rejected') {
+            final visitorName = data['name'] as String? ?? 'Visitor';
+            final approved = status == 'approved';
+            
+            // Send notification
+            notifyVisitorApproval(
+              visitorId: visitorId,
+              visitorName: visitorName,
+              approved: approved,
+            );
+          }
+        }
+      }
+    });
   }
 
   // Mark all user notifications as read

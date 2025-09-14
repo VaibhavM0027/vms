@@ -4,6 +4,7 @@ import '../services/visitor_service.dart';
 import '../models/visitor_model.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HostApprovalScreen extends StatefulWidget {
@@ -15,8 +16,9 @@ class HostApprovalScreen extends StatefulWidget {
 
 class _HostApprovalScreenState extends State<HostApprovalScreen> {
   final FirebaseServices _firebaseServices = FirebaseServices();
+  final NotificationService _notificationService = NotificationService();
 
-  Future<void> _updateVisitorStatus(String visitorId, String status) async {
+  Future<void> _updateVisitorStatus(String visitorId, String status, String visitorName) async {
     try {
       await _firebaseServices.updateVisitorStatus(visitorId, status);
       if (status == 'approved') {
@@ -25,6 +27,18 @@ class _HostApprovalScreenState extends State<HostApprovalScreen> {
             .doc(visitorId)
             .update({'checkIn': FieldValue.serverTimestamp()});
       }
+
+      // Send notification to visitor
+      try {
+        await _notificationService.notifyVisitorApproval(
+          visitorId: visitorId,
+          visitorName: visitorName,
+          approved: status == 'approved',
+        );
+      } catch (e) {
+        debugPrint('Error sending notification: $e');
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Visitor ${status.toLowerCase()}')),
       );
@@ -103,12 +117,12 @@ class _HostApprovalScreenState extends State<HostApprovalScreen> {
                       IconButton(
                         icon: const Icon(Icons.check, color: Colors.green),
                         onPressed: () =>
-                            _updateVisitorStatus(visitor.id!, 'approved'),
+                            _updateVisitorStatus(visitor.id!, 'approved', visitor.name),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close, color: Colors.red),
                         onPressed: () =>
-                            _updateVisitorStatus(visitor.id!, 'rejected'),
+                            _updateVisitorStatus(visitor.id!, 'rejected', visitor.name),
                       ),
                     ],
                   ),

@@ -13,11 +13,79 @@ import 'user_registration_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
+import '../services/visitor_service.dart';
 import 'pre_register_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
+
+  Widget _buildNotificationButton(BuildContext context, String role) {
+    final FirebaseServices _firebaseServices = FirebaseServices();
+    
+    if (role == 'admin' || role == 'host') {
+      return StreamBuilder(
+        stream: _firebaseServices.getAllPendingVisitors(),
+        builder: (context, snapshot) {
+          int pendingCount = 0;
+          if (snapshot.hasData) {
+            pendingCount = snapshot.data?.length ?? 0;
+          }
+          
+          return Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                  );
+                },
+                tooltip: 'Notifications',
+              ),
+              if (pendingCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$pendingCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
+    } else {
+      return IconButton(
+        icon: const Icon(Icons.notifications),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          );
+        },
+        tooltip: 'Notifications',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,21 +107,17 @@ class DashboardScreen extends StatelessWidget {
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
-            tooltip: 'Notifications',
-          ),
+          _buildNotificationButton(context, role),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              // Navigate to login screen instead of just popping
+              Navigator.pushNamedAndRemoveUntil(
+                context, 
+                '/login', 
+                (route) => false
+              );
             },
             tooltip: 'Logout',
           ),

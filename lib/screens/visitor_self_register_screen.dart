@@ -167,26 +167,26 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: Colors.grey[850],
         title: const Text(
-          'Checkout Option',
+          'Registration Complete!',
           style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.exit_to_app,
+              Icons.hourglass_empty,
               size: 48,
-              color: Colors.blue[300],
+              color: Colors.orange[300],
             ),
             const SizedBox(height: 16),
             Text(
-              'Would you like to check out now or later?',
+              'Your visit request is pending approval.',
               style: TextStyle(color: Colors.grey[300], fontSize: 16),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'You can always check out from the main dashboard.',
+              'You will receive a notification when your visit is approved or rejected. You can check your status anytime.',
               style: TextStyle(color: Colors.grey[400], fontSize: 14),
               textAlign: TextAlign.center,
             ),
@@ -196,17 +196,17 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.popUntil(context, (r) => r.isFirst);
+              // Don't navigate away, just close the dialog to show the floating action button
             },
             child: Text(
-              'Later',
+              'Stay Here',
               style: TextStyle(color: Colors.grey[400], fontSize: 16),
             ),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              _navigateToCheckout(qrData);
+              _navigateToStatus(qrData);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue[700],
@@ -214,7 +214,7 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
             child: const Text(
-              'Checkout Now',
+              'Check Status',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
@@ -223,8 +223,9 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
     );
   }
 
-  void _navigateToCheckout(String qrData) {
-    Navigator.pushNamed(context, '/checkout', arguments: {'qrCode': qrData});
+
+  void _navigateToStatus(String qrData) {
+    Navigator.pushNamed(context, '/visitor-status', arguments: {'visitorId': qrData});
   }
 
   @override
@@ -238,11 +239,11 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
       ),
       floatingActionButton: _lastGeneratedQR != null
           ? FloatingActionButton.extended(
-              onPressed: () => _navigateToCheckout(_lastGeneratedQR!),
+              onPressed: () => _navigateToStatus(_lastGeneratedQR!),
               backgroundColor: Colors.blue[700],
               foregroundColor: Colors.white,
-              icon: const Icon(Icons.exit_to_app),
-              label: const Text('Checkout'),
+              icon: const Icon(Icons.info),
+              label: const Text('Check Status'),
             )
           : null,
       body: Container(

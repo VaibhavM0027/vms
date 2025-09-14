@@ -82,6 +82,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
+      if (visitor.status == 'pending') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Visitor must be approved before checkout'), backgroundColor: Colors.orange[700]),
+        );
+        return;
+      }
+
       await _firebaseServices.checkOutVisitor(visitor.id!, _notesController.text);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Visitor checked out successfully'), backgroundColor: Colors.green[700]),

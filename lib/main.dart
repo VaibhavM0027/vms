@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'screens/checkout_screen.dart';
+import 'screens/visitor_status_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -157,6 +159,20 @@ class MyApp extends StatelessWidget {
               builder: (context) {
                 return CheckoutRouteWrapper(settings.arguments);
               },
+            );
+          }
+          if (settings.name == '/visitor-status') {
+            final args = settings.arguments as Map<String, dynamic>?;
+            final visitorId = args?['visitorId'] as String?;
+            if (visitorId != null) {
+              return MaterialPageRoute(
+                builder: (context) => VisitorStatusScreen(visitorId: visitorId),
+              );
+            }
+          }
+          if (settings.name == '/login') {
+            return MaterialPageRoute(
+              builder: (context) => const LoginScreen(),
             );
           }
           return null;
