@@ -30,10 +30,10 @@ class FirebaseServices {
   // Visitor Operations
   Future<String> addVisitor(Visitor visitor) async {
     try {
-      // Check if visitor already exists by contact number
-      final existingVisitor = await findVisitorByContact(visitor.contact);
+      // Check if a registered visitor already exists by contact number
+      final existingRegisteredVisitor = await findVisitorByContact(visitor.contact);
       
-      if (existingVisitor != null && existingVisitor.isRegistered) {
+      if (existingRegisteredVisitor != null && existingRegisteredVisitor.isRegistered) {
         // Update existing registered visitor with new visit
         final visitData = {
           'checkIn': visitor.checkIn,
@@ -46,13 +46,13 @@ class FirebaseServices {
         };
         
         // Add new visit to history
-        List<Map<String, dynamic>> history = existingVisitor.visitHistory != null 
-            ? List.from(existingVisitor.visitHistory!)
+        List<Map<String, dynamic>> history = existingRegisteredVisitor.visitHistory != null 
+            ? List.from(existingRegisteredVisitor.visitHistory!)
             : [];
         history.add(visitData);
         
         // Update visitor document
-        await _firestore.collection('visitors').doc(existingVisitor.id).update({
+        await _firestore.collection('visitors').doc(existingRegisteredVisitor.id).update({
           'visitHistory': history,
           'visitDate': visitor.visitDate,
           'checkIn': visitor.checkIn,
@@ -63,18 +63,61 @@ class FirebaseServices {
           'status': 'pending',
         });
         
-        return existingVisitor.id!;
+        return existingRegisteredVisitor.id!;
       } else {
-        // Create new visitor
+        // If a visitor exists by contact (but not registered), upgrade to registered when requested
+        final existingByContactAny = await _firestore
+            .collection('visitors')
+            .where('contact', isEqualTo: visitor.contact)
+            .limit(1)
+            .get();
+
+        if (existingByContactAny.docs.isNotEmpty) {
+          final doc = existingByContactAny.docs.first;
+          final data = doc.data();
+          final bool wasRegistered = (data['isRegistered'] ?? false) as bool;
+
+          if (!wasRegistered && visitor.isRegistered) {
+            // Upgrade existing document to a permanent registered visitor, keep the same id as QR code
+            List<Map<String, dynamic>> history = [];
+            history.add({
+              'checkIn': visitor.checkIn,
+              'checkOut': null,
+              'purpose': visitor.purpose,
+              'hostId': visitor.hostId,
+              'hostName': visitor.hostName,
+              'status': 'pending',
+              'visitDate': visitor.visitDate,
+            });
+
+            await _firestore.collection('visitors').doc(doc.id).update({
+              'name': visitor.name,
+              'email': visitor.email,
+              'purpose': visitor.purpose,
+              'hostId': visitor.hostId,
+              'hostName': visitor.hostName,
+              'visitDate': visitor.visitDate,
+              'checkIn': visitor.checkIn,
+              'checkOut': null,
+              'status': 'pending',
+              'isRegistered': true,
+              'qrCode': data['qrCode'] ?? doc.id,
+              'visitHistory': history,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+            return doc.id;
+          }
+        }
+
+        // Create new visitor document
         final docRef = _firestore.collection('visitors').doc();
         final data = visitor.toMap();
-        
-        // Generate permanent QR code for the visitor
+
+        // Generate permanent QR code only for registered visitors; for temporary, still assign id (useful for scanning during the visit)
         data['qrCode'] = data['qrCode'] ?? docRef.id;
         data['createdAt'] = FieldValue.serverTimestamp();
         data['isRegistered'] = visitor.isRegistered;
-        
-        // Initialize visit history if this is a registered visitor
+
         if (visitor.isRegistered) {
           data['visitHistory'] = [{
             'checkIn': visitor.checkIn,
@@ -86,7 +129,7 @@ class FirebaseServices {
             'visitDate': visitor.visitDate,
           }];
         }
-        
+
         await docRef.set(data);
         return docRef.id;
       }

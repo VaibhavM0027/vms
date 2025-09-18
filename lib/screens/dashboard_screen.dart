@@ -12,6 +12,7 @@ import 'notifications_screen.dart';
 import 'user_registration_screen.dart';
 import 'guard_register_visitor_screen.dart';
 import 'all_visitor_history_screen.dart';
+import 'entry_exit_history_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
@@ -170,6 +171,13 @@ class DashboardScreen extends StatelessWidget {
                 Icons.history,
                 'Visitor History',
                 const AllVisitorHistoryScreen(),
+              ),
+            if (role == 'admin' || role == 'receptionist')
+              _buildDashboardItem(
+                context,
+                Icons.timeline,
+                'Entry/Exit History',
+                const EntryExitHistoryScreen(),
               ),
             // Checkout button for all roles (admin, receptionist, visitor)
             _buildDashboardItem(

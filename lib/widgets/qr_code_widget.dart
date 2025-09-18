@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
+import 'dart:io';
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class CustomQRCodeWidget extends StatelessWidget {
   final String data;
@@ -104,7 +110,7 @@ class CustomQRCodeWidget extends StatelessWidget {
   }
 }
 
-class QRCodeDialog extends StatelessWidget {
+class QRCodeDialog extends StatefulWidget {
   final String qrData;
   final String visitorName;
   final String visitorContact;
@@ -121,7 +127,67 @@ class QRCodeDialog extends StatelessWidget {
   });
 
   @override
+  State<QRCodeDialog> createState() => _QRCodeDialogState();
+}
+
+class _QRCodeDialogState extends State<QRCodeDialog> {
+  final GlobalKey _qrKey = GlobalKey();
+  bool _isProcessing = false;
+
+  Future<File?> _captureQrToFile() async {
+    try {
+      setState(() => _isProcessing = true);
+      await Future.delayed(const Duration(milliseconds: 50)); // ensure painted
+      RenderRepaintBoundary boundary = _qrKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return null;
+      Uint8List pngBytes = byteData.buffer.asUint8List();
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/qr_${DateTime.now().millisecondsSinceEpoch}.png');
+      await file.writeAsBytes(pngBytes);
+      return file;
+    } catch (_) {
+      return null;
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _shareQr() async {
+    final file = await _captureQrToFile();
+    if (file != null) {
+      await Share.shareXFiles([XFile(file.path)], text: 'Visitor QR: ${widget.visitorName}');
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to share QR')));
+    }
+  }
+
+  Future<void> _saveQr() async {
+    final file = await _captureQrToFile();
+    if (!mounted) return;
+    if (file != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('QR saved to: ${file.path}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save QR')));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return _buildDialog(context);
+  }
+
+  Widget _buildDialog(BuildContext context) {
+    final qrData = widget.qrData;
+    final visitorName = widget.visitorName;
+    final visitorContact = widget.visitorContact;
+    final visitorPurpose = widget.visitorPurpose;
+    final onDone = widget.onDone;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       child: Container(

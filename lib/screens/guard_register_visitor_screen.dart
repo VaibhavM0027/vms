@@ -4,6 +4,7 @@ import '../models/visitor_model.dart';
 import '../services/visitor_service.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/text_input.dart';
+import '../widgets/qr_code_widget.dart';
 
 class GuardRegisterVisitorScreen extends StatefulWidget {
   const GuardRegisterVisitorScreen({Key? key}) : super(key: key);
@@ -66,6 +67,39 @@ class _GuardRegisterVisitorScreenState extends State<GuardRegisterVisitorScreen>
     });
 
     try {
+      // Prevent duplicate permanent registrations for the same contact
+      if (_isRegistered) {
+        final existing = await FirebaseFirestore.instance
+            .collection('visitors')
+            .where('contact', isEqualTo: _contactController.text.trim())
+            .where('isRegistered', isEqualTo: true)
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          final data = existing.docs.first.data();
+          final String qrExisting = (data['qrCode'] ?? existing.docs.first.id).toString();
+
+          setState(() { _isLoading = false; });
+
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => QRCodeDialog(
+              qrData: qrExisting,
+              visitorName: data['name']?.toString() ?? _nameController.text,
+              visitorContact: data['contact']?.toString() ?? _contactController.text,
+              visitorPurpose: data['purpose']?.toString() ?? _purposeController.text,
+              onDone: () { Navigator.of(ctx).pop(); },
+            ),
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Existing registered visitor found. Reusing fixed QR.')),
+          );
+          return; // Do not create a duplicate registered record
+        }
+      }
+
       final visitor = Visitor(
         name: _nameController.text,
         contact: _contactController.text,
@@ -79,16 +113,37 @@ class _GuardRegisterVisitorScreenState extends State<GuardRegisterVisitorScreen>
       );
 
       final visitorId = await _firebaseServices.addVisitor(visitor);
-      
+
+      // Fetch the created/updated visitor to get the fixed QR code value
+      final doc = await FirebaseFirestore.instance.collection('visitors').doc(visitorId).get();
+      final data = doc.data() ?? {};
+      final String qrCode = (data['qrCode'] ?? visitorId).toString();
+
       setState(() {
         _isLoading = false;
       });
 
+      // Show QR Code dialog so guard can hand over to visitor
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => QRCodeDialog(
+          qrData: qrCode,
+          visitorName: _nameController.text,
+          visitorContact: _contactController.text,
+          visitorPurpose: _purposeController.text,
+          onDone: () {
+            Navigator.of(ctx).pop();
+          },
+        ),
+      );
+
+      // Success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Visitor registered successfully')),
       );
 
-      // Clear form
+      // Clear form after showing the QR
       _nameController.clear();
       _contactController.clear();
       _emailController.clear();

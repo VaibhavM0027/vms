@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/visitor_model.dart';
 import '../services/visitor_service.dart';
 import 'checkout_screen.dart';
+import '../widgets/qr_code_widget.dart';
 
 class VisitorDetailsScreen extends StatelessWidget {
   final Visitor visitor;
@@ -12,6 +13,7 @@ class VisitorDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String qrData = visitor.qrCode ?? visitor.id ?? '';
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -19,6 +21,12 @@ class VisitorDetailsScreen extends StatelessWidget {
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
+          if (qrData.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.qr_code),
+              tooltip: 'Show QR',
+              onPressed: () => _showQrDialog(context, qrData),
+            ),
           if (visitor.status == 'pending')
             IconButton(
               icon: Icon(Icons.check, color: Colors.green[300]),
@@ -93,6 +101,35 @@ class VisitorDetailsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
+
+              // Visitor QR section (fixed QR)
+              if (qrData.isNotEmpty)
+                _buildSection('Visitor QR', [
+                  Center(
+                    child: CustomQRCodeWidget(
+                      data: qrData,
+                      size: 180,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      errorMessage: 'QR unavailable',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _showQrDialog(context, qrData),
+                        icon: const Icon(Icons.fullscreen),
+                        label: const Text('Open QR'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ]),
 
               // Personal Information
               _buildSection('Personal Information', [
@@ -321,6 +358,20 @@ class VisitorDetailsScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => CheckoutScreen(visitor: visitor)),
+    );
+  }
+
+  void _showQrDialog(BuildContext context, String qrData) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => QRCodeDialog(
+        qrData: qrData,
+        visitorName: visitor.name,
+        visitorContact: visitor.contact,
+        visitorPurpose: visitor.purpose,
+        onDone: () => Navigator.of(ctx).pop(),
+      ),
     );
   }
 }
