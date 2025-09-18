@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/config_service.dart';
+import 'guard_register_visitor_screen.dart';
 
 class GuardScanScreen extends StatefulWidget {
   const GuardScanScreen({super.key});
@@ -153,6 +154,51 @@ class _GuardScanScreenState extends State<GuardScanScreen> {
                   onPressed: () => _controller.switchCamera(),
                   icon: const Icon(Icons.cameraswitch),
                   label: const Text('Camera'),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // Navigate to guard register visitor screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const GuardRegisterVisitorScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('Register Visitor'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // Restart the scanner
+                        _controller.start();
+                      },
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: const Text('Scan QR Code'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

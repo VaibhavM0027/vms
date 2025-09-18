@@ -30,15 +30,87 @@ class FirebaseServices {
   // Visitor Operations
   Future<String> addVisitor(Visitor visitor) async {
     try {
-      // Ensure qrCode is the Firestore document ID to prevent forged QR payloads
-      final docRef = _firestore.collection('visitors').doc();
-      final data = visitor.toMap();
-      data['qrCode'] = data['qrCode'] ?? docRef.id;
-      data['createdAt'] = FieldValue.serverTimestamp();
-      await docRef.set(data);
-      return docRef.id;
+      // Check if visitor already exists by contact number
+      final existingVisitor = await findVisitorByContact(visitor.contact);
+      
+      if (existingVisitor != null && existingVisitor.isRegistered) {
+        // Update existing registered visitor with new visit
+        final visitData = {
+          'checkIn': visitor.checkIn,
+          'checkOut': null,
+          'purpose': visitor.purpose,
+          'hostId': visitor.hostId,
+          'hostName': visitor.hostName,
+          'status': 'pending',
+          'visitDate': visitor.visitDate,
+        };
+        
+        // Add new visit to history
+        List<Map<String, dynamic>> history = existingVisitor.visitHistory != null 
+            ? List.from(existingVisitor.visitHistory!)
+            : [];
+        history.add(visitData);
+        
+        // Update visitor document
+        await _firestore.collection('visitors').doc(existingVisitor.id).update({
+          'visitHistory': history,
+          'visitDate': visitor.visitDate,
+          'checkIn': visitor.checkIn,
+          'checkOut': null,
+          'purpose': visitor.purpose,
+          'hostId': visitor.hostId,
+          'hostName': visitor.hostName,
+          'status': 'pending',
+        });
+        
+        return existingVisitor.id!;
+      } else {
+        // Create new visitor
+        final docRef = _firestore.collection('visitors').doc();
+        final data = visitor.toMap();
+        
+        // Generate permanent QR code for the visitor
+        data['qrCode'] = data['qrCode'] ?? docRef.id;
+        data['createdAt'] = FieldValue.serverTimestamp();
+        data['isRegistered'] = visitor.isRegistered;
+        
+        // Initialize visit history if this is a registered visitor
+        if (visitor.isRegistered) {
+          data['visitHistory'] = [{
+            'checkIn': visitor.checkIn,
+            'checkOut': null,
+            'purpose': visitor.purpose,
+            'hostId': visitor.hostId,
+            'hostName': visitor.hostName,
+            'status': 'pending',
+            'visitDate': visitor.visitDate,
+          }];
+        }
+        
+        await docRef.set(data);
+        return docRef.id;
+      }
     } catch (e) {
       throw Exception('Failed to add visitor: $e');
+    }
+  }
+  
+  // Find visitor by contact number
+  Future<Visitor?> findVisitorByContact(String contact) async {
+    try {
+      final snapshot = await _firestore
+          .collection('visitors')
+          .where('contact', isEqualTo: contact)
+          .where('isRegistered', isEqualTo: true)
+          .limit(1)
+          .get();
+      
+      if (snapshot.docs.isNotEmpty) {
+        return Visitor.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Failed to find visitor: $e');
     }
   }
 
@@ -66,10 +138,34 @@ class FirebaseServices {
 
   Future<void> checkInVisitor(String visitorId) async {
     try {
-      await _firestore.collection('visitors').doc(visitorId).update({
-        'checkIn': FieldValue.serverTimestamp(),
-        'status': 'checked-in',
-      });
+      // Get the visitor document
+      final visitorDoc = await _firestore.collection('visitors').doc(visitorId).get();
+      final visitorData = visitorDoc.data();
+      
+      if (visitorData != null && visitorData['isRegistered'] == true) {
+        // For registered visitors, update the current visit in history
+        List<Map<String, dynamic>> history = visitorData['visitHistory'] != null 
+            ? List.from(visitorData['visitHistory'])
+            : [];
+            
+        if (history.isNotEmpty) {
+          // Update the most recent visit
+          history.last['checkIn'] = FieldValue.serverTimestamp();
+          history.last['status'] = 'checked-in';
+        }
+        
+        await _firestore.collection('visitors').doc(visitorId).update({
+          'checkIn': FieldValue.serverTimestamp(),
+          'status': 'checked-in',
+          'visitHistory': history,
+        });
+      } else {
+        // For non-registered visitors
+        await _firestore.collection('visitors').doc(visitorId).update({
+          'checkIn': FieldValue.serverTimestamp(),
+          'status': 'checked-in',
+        });
+      }
     } catch (e) {
       throw Exception('Failed to check-in visitor: $e');
     }
@@ -77,11 +173,38 @@ class FirebaseServices {
 
   Future<void> checkOutVisitor(String visitorId, String? meetingNotes) async {
     try {
-      await _firestore.collection('visitors').doc(visitorId).update({
-        'checkOut': FieldValue.serverTimestamp(),
-        'status': 'completed',
-        'meetingNotes': meetingNotes,
-      });
+      // Get the visitor document
+      final visitorDoc = await _firestore.collection('visitors').doc(visitorId).get();
+      final visitorData = visitorDoc.data();
+      final checkOutTime = FieldValue.serverTimestamp();
+      
+      if (visitorData != null && visitorData['isRegistered'] == true) {
+        // For registered visitors, update the current visit in history
+        List<Map<String, dynamic>> history = visitorData['visitHistory'] != null 
+            ? List.from(visitorData['visitHistory'])
+            : [];
+            
+        if (history.isNotEmpty) {
+          // Update the most recent visit
+          history.last['checkOut'] = checkOutTime;
+          history.last['status'] = 'completed';
+          history.last['meetingNotes'] = meetingNotes;
+        }
+        
+        await _firestore.collection('visitors').doc(visitorId).update({
+          'checkOut': checkOutTime,
+          'status': 'completed',
+          'meetingNotes': meetingNotes,
+          'visitHistory': history,
+        });
+      } else {
+        // For non-registered visitors
+        await _firestore.collection('visitors').doc(visitorId).update({
+          'checkOut': checkOutTime,
+          'status': 'completed',
+          'meetingNotes': meetingNotes,
+        });
+      }
     } catch (e) {
       throw Exception('Failed to check-out visitor: $e');
     }

@@ -6,6 +6,7 @@ import '../services/visitor_service.dart';
 import '../services/auth_service.dart';
 import 'visitor_details_screen.dart';
 import 'checkout_screen.dart';
+import 'visitor_history_screen.dart';
 
 class VisitorListScreen extends StatefulWidget {
   const VisitorListScreen({super.key});
@@ -17,7 +18,7 @@ class VisitorListScreen extends StatefulWidget {
 class _VisitorListScreenState extends State<VisitorListScreen> {
   final FirebaseServices _firebaseServices = FirebaseServices();
   String _filterStatus = 'all';
-  bool _showCheckedOut = false;
+  bool _showCheckedOut = true;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -158,7 +159,16 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                       Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
                       const SizedBox(height: 16),
                       Text('No visitors found', style: TextStyle(color: Colors.grey[100], fontSize: 18)),
-                      Text('Try adjusting your filters', style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+                      Text(_searchQuery.isNotEmpty || _filterStatus != 'all' 
+                          ? 'Try adjusting your filters' 
+                          : 'No visitors have been registered yet', 
+                          style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+                      if (_searchQuery.isEmpty && _filterStatus == 'all' && !_showCheckedOut)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text('Enable "Show Checked-out" to see completed visits', 
+                              style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                        ),
                     ]));
                   }
 
@@ -179,6 +189,26 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
                             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => VisitorDetailsScreen(visitor: visitor))),
+                            onLongPress: () {
+                              // Show history option if visitor is registered
+                              if (visitor.isRegistered) {
+                                Navigator.push(
+                                  context, 
+                                  MaterialPageRoute(
+                                    builder: (context) => VisitorHistoryScreen(
+                                      visitorId: visitor.id!,
+                                      visitorName: visitor.name,
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Visit history is only available for registered visitors'),
+                                  ),
+                                );
+                              }
+                            },
                             child: Padding(
                               padding: const EdgeInsets.all(12),
                               child: Column(
@@ -188,11 +218,27 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                                   Row(
                                     children: [
                                       Expanded(
-                                        child: Text(
-                                          visitor.name, 
-                                          style: TextStyle(color: Colors.grey[100]!, fontSize: 16, fontWeight: FontWeight.w600),
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 1,
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              visitor.name, 
+                                              style: TextStyle(color: Colors.grey[100]!, fontSize: 16, fontWeight: FontWeight.w600),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                            if (visitor.isRegistered)
+                                              Padding(
+                                                padding: const EdgeInsets.only(left: 8.0),
+                                                child: Tooltip(
+                                                  message: "Registered visitor - Long press to view history",
+                                                  child: Icon(
+                                                    Icons.history,
+                                                    size: 16,
+                                                    color: Colors.blue[300],
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ),
                                       const SizedBox(width: 8),

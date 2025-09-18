@@ -15,7 +15,9 @@ class Visitor {
   final DateTime? checkOut;
   final String? meetingNotes;
   final String status; // 'pending', 'approved', 'rejected', 'completed'
-  final String? qrCode; // encoded visitor id/payload
+  final String? qrCode; // permanent unique QR code for registered visitors
+  final bool isRegistered; // indicates if this is a registered visitor
+  final List<Map<String, dynamic>>? visitHistory; // list of previous visits
 
   Visitor({
     this.id,
@@ -33,6 +35,8 @@ class Visitor {
     this.meetingNotes,
     this.status = 'pending',
     this.qrCode,
+    this.isRegistered = false,
+    this.visitHistory,
   });
 
   Map<String, dynamic> toMap() {
@@ -51,6 +55,8 @@ class Visitor {
       'meetingNotes': meetingNotes,
       'status': status,
       'qrCode': qrCode,
+      'isRegistered': isRegistered,
+      'visitHistory': visitHistory,
     };
   }
 
@@ -77,6 +83,10 @@ class Visitor {
       meetingNotes: map['meetingNotes'],
       status: map['status'] ?? 'pending',
       qrCode: map['qrCode'],
+      isRegistered: map['isRegistered'] ?? false,
+      visitHistory: map['visitHistory'] != null 
+          ? List<Map<String, dynamic>>.from(map['visitHistory'])
+          : null,
     );
   }
 }

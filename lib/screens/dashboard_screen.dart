@@ -10,6 +10,8 @@ import 'visitor_self_register_screen.dart';
 import 'host_management_screen.dart';
 import 'notifications_screen.dart';
 import 'user_registration_screen.dart';
+import 'guard_register_visitor_screen.dart';
+import 'all_visitor_history_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
@@ -162,6 +164,13 @@ class DashboardScreen extends StatelessWidget {
                 'Visitor List',
                 const VisitorListScreen(),
               ),
+            if (role == 'admin' || role == 'receptionist')
+              _buildDashboardItem(
+                context,
+                Icons.history,
+                'Visitor History',
+                const AllVisitorHistoryScreen(),
+              ),
             // Checkout button for all roles (admin, receptionist, visitor)
             _buildDashboardItem(
               context,
@@ -175,6 +184,13 @@ class DashboardScreen extends StatelessWidget {
                 Icons.qr_code_scanner,
                 'Guard Scan',
                 const GuardScanScreen(),
+              ),
+            if (role == 'guard' || role == 'admin')
+              _buildDashboardItem(
+                context,
+                Icons.app_registration,
+                'Register Visitor',
+                const GuardRegisterVisitorScreen(),
               ),
             if (role == 'admin' || role == 'host')
               _buildDashboardItem(
