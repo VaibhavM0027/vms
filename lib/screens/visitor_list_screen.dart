@@ -218,13 +218,16 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                                   Row(
                                     children: [
                                       Expanded(
+                                        flex: 3,
                                         child: Row(
                                           children: [
-                                            Text(
-                                              visitor.name, 
-                                              style: TextStyle(color: Colors.grey[100]!, fontSize: 16, fontWeight: FontWeight.w600),
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
+                                            Flexible(
+                                              child: Text(
+                                                visitor.name, 
+                                                style: TextStyle(color: Colors.grey[100]!, fontSize: 16, fontWeight: FontWeight.w600),
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
+                                              ),
                                             ),
                                             if (visitor.isRegistered)
                                               Padding(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/config_service.dart';
 import 'guard_register_visitor_screen.dart';
+import 'guard_checkout_request_screen.dart';
 
 class GuardScanScreen extends StatefulWidget {
   const GuardScanScreen({super.key});
@@ -43,10 +44,19 @@ class _GuardScanScreenState extends State<GuardScanScreen> {
       final requireApproval = await ConfigService.requireApproval();
       final canEnter = requireApproval ? (status == 'approved') : (status == 'approved' || status == 'pending');
       if (canEnter) {
-        await doc.reference.update({'checkIn': FieldValue.serverTimestamp()});
+        await doc.reference.update({
+          'checkIn': FieldValue.serverTimestamp(),
+          'status': 'approved'
+        });
         _show('Allowed: $name');
       } else if (status == 'completed') {
-        _show('Already checked out');
+        // Allow reuse of QR code for checked-out visitors
+        await doc.reference.update({
+          'checkIn': FieldValue.serverTimestamp(),
+          'checkOut': null,
+          'status': 'approved'
+        });
+        _show('Welcome back: $name');
       } else if (status == 'rejected') {
         _show('Denied: $name');
       } else {
@@ -158,51 +168,71 @@ class _GuardScanScreenState extends State<GuardScanScreen> {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Navigate to guard register visitor screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const GuardRegisterVisitorScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.person_add),
-                      label: const Text('Register Visitor'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Navigate to guard register visitor screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const GuardRegisterVisitorScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('Register Visitor'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
                 ),
+                const SizedBox(width: 16),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Restart the scanner
-                        _controller.start();
-                      },
-                      icon: const Icon(Icons.qr_code_scanner),
-                      label: const Text('Scan QR Code'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Restart the scanner
+                      _controller.start();
+                    },
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Scan QR Code'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      minimumSize: const Size(double.infinity, 48),
                     ),
                   ),
                 ),
               ],
             ),
-          )
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // Navigate to checkout request screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const GuardCheckoutRequestScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Request Visitor Checkout'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+          ),
         ],
       ),
     );

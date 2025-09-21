@@ -8,6 +8,54 @@ class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
+  
+  Future<void> sendAdminNotification({
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      // Get all admin tokens
+      final adminTokens = await _getAdminTokens();
+      
+      if (adminTokens.isEmpty) {
+        debugPrint('No admin tokens found for notification');
+        return;
+      }
+      
+      // Store notification in Firestore
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'title': title,
+        'body': body,
+        'data': data,
+        'recipients': adminTokens,
+        'createdAt': FieldValue.serverTimestamp(),
+        'read': false,
+      });
+      
+      debugPrint('Admin notification stored successfully');
+    } catch (e) {
+      debugPrint('Error sending admin notification: $e');
+    }
+  }
+  
+  Future<List<String>> _getAdminTokens() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .where('fcmToken', isNull: false)
+          .get();
+          
+      return snapshot.docs
+          .map((doc) => doc.data()['fcmToken'] as String)
+          .where((token) => token.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting admin tokens: $e');
+      return [];
+    }
+  }
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;

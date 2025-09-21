@@ -51,11 +51,11 @@ class VisitorHistoryScreen extends StatelessWidget {
           sortedHistory.sort((a, b) {
             final aDate = a['checkIn'] is Timestamp 
                 ? (a['checkIn'] as Timestamp).toDate() 
-                : DateTime.parse(a['checkIn'].toString());
+                : DateTime.now();
             final bDate = b['checkIn'] is Timestamp 
                 ? (b['checkIn'] as Timestamp).toDate() 
-                : DateTime.parse(b['checkIn'].toString());
-            return bDate.compareTo(aDate);
+                : DateTime.now();
+            return bDate.compareTo(aDate); // Most recent first
           });
 
           return ListView.builder(

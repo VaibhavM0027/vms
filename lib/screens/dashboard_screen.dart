@@ -225,7 +225,7 @@ class DashboardScreen extends StatelessWidget {
               _buildDashboardItem(
                 context,
                 Icons.person_add_alt,
-                'Add User',
+                'Register User',
                 const UserRegistrationScreen(),
               ),
             if (role == 'admin')
