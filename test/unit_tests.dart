@@ -56,7 +56,7 @@ void main() {
         'status': 'pending',
       };
 
-      final visitor = Visitor.fromMap(map);
+      final visitor = Visitor.fromMap(map, 'test-id');
       expect(visitor.name, 'John Doe');
       expect(visitor.contact, '+1234567890');
       expect(visitor.status, 'pending');

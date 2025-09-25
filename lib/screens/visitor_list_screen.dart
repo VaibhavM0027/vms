@@ -214,9 +214,26 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Header row with name and status
+                                  // Header row with name, profile picture, and status
                                   Row(
                                     children: [
+                                      // Profile picture
+                                      CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor: Colors.grey[300],
+                                        backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                                            ? NetworkImage(visitor.photoUrl!)
+                                            : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                                                ? NetworkImage(visitor.idImageUrl!)
+                                                : null,
+                                        child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
+                                            ? Text(
+                                                visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                              )
+                                            : null,
+                                      ),
+                                      const SizedBox(width: 12),
                                       Expanded(
                                         flex: 3,
                                         child: Row(

@@ -148,6 +148,24 @@ class _GuardCheckoutRequestScreenState extends State<GuardCheckoutRequestScreen>
                             margin: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             child: ListTile(
+                              leading: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.grey[300],
+                                backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                                    ? NetworkImage(visitor.photoUrl!)
+                                    : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                                        ? NetworkImage(visitor.idImageUrl!)
+                                        : null,
+                                child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
+                                    ? Text(
+                                        visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                      )
+                                    : null,
+                              ),
                               title: Text(visitor.name),
                               subtitle: Text(
                                   '${visitor.email}\nHost: ${visitor.hostName}'),

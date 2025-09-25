@@ -338,7 +338,7 @@ class FirebaseServices {
     }
   }
 
-  // Get visitor by QR code
+  // Get visitor by QR code with visit context
   Future<Visitor?> getVisitorByQRCode(String qrCode) async {
     try {
       final snapshot = await _firestore
@@ -348,11 +348,95 @@ class FirebaseServices {
           .get();
 
       if (snapshot.docs.isNotEmpty) {
-        return Visitor.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+        final visitor = Visitor.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+        return visitor;
       }
       return null;
     } catch (e) {
       throw Exception('Failed to fetch visitor by QR code: $e');
+    }
+  }
+  
+  // Check if visitor can start new visit
+  Future<bool> canStartNewVisit(String visitorId) async {
+    try {
+      final doc = await _firestore.collection('visitors').doc(visitorId).get();
+      if (!doc.exists) return false;
+      
+      final data = doc.data()!;
+      final isRegistered = data['isRegistered'] ?? false;
+      final status = data['status'] ?? 'pending';
+      final checkOut = data['checkOut'];
+      
+      // Registered visitors can always start new visits if their last visit is completed
+      if (isRegistered && (status == 'completed' || checkOut != null)) {
+        return true;
+      }
+      
+      // Non-registered visitors can start new visit only if status is completed
+      return status == 'completed';
+    } catch (e) {
+      throw Exception('Failed to check visit eligibility: $e');
+    }
+  }
+  
+  // Start new visit for existing visitor
+  Future<void> startNewVisit(String visitorId, {
+    String? newPurpose,
+    String? newHostId,
+    String? newHostName,
+  }) async {
+    try {
+      final doc = await _firestore.collection('visitors').doc(visitorId).get();
+      if (!doc.exists) throw Exception('Visitor not found');
+      
+      final data = doc.data()!;
+      final isRegistered = data['isRegistered'] ?? false;
+      
+      if (isRegistered) {
+        // For registered visitors, add new visit to history
+        List<Map<String, dynamic>> history = data['visitHistory'] != null 
+            ? List.from(data['visitHistory'])
+            : [];
+            
+        final newVisit = {
+          'checkIn': FieldValue.serverTimestamp(),
+          'checkOut': null,
+          'purpose': newPurpose ?? data['purpose'] ?? 'Visit',
+          'hostId': newHostId ?? data['hostId'],
+          'hostName': newHostName ?? data['hostName'],
+          'status': 'pending', // New visits start as pending
+          'visitDate': FieldValue.serverTimestamp(),
+        };
+        history.add(newVisit);
+        
+        // Update visitor document with new visit info
+        await _firestore.collection('visitors').doc(visitorId).update({
+          'checkIn': FieldValue.serverTimestamp(),
+          'checkOut': null,
+          'status': 'pending',
+          'visitDate': FieldValue.serverTimestamp(),
+          'purpose': newPurpose ?? data['purpose'],
+          'hostId': newHostId ?? data['hostId'],
+          'hostName': newHostName ?? data['hostName'],
+          'visitHistory': history,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // For non-registered visitors, just update the document
+        await _firestore.collection('visitors').doc(visitorId).update({
+          'checkIn': FieldValue.serverTimestamp(),
+          'checkOut': null,
+          'status': 'pending',
+          'visitDate': FieldValue.serverTimestamp(),
+          'purpose': newPurpose ?? data['purpose'],
+          'hostId': newHostId ?? data['hostId'],
+          'hostName': newHostName ?? data['hostName'],
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      throw Exception('Failed to start new visit: $e');
     }
   }
 

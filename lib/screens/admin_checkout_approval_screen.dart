@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/visitor_model.dart';
 
 class AdminCheckoutApprovalScreen extends StatefulWidget {
   const AdminCheckoutApprovalScreen({super.key});
@@ -10,51 +9,17 @@ class AdminCheckoutApprovalScreen extends StatefulWidget {
 }
 
 class _AdminCheckoutApprovalScreenState extends State<AdminCheckoutApprovalScreen> {
-  bool _isLoading = true;
-  List<Map<String, dynamic>> _checkoutRequests = [];
+  late Stream<QuerySnapshot> _checkoutRequestsStream;
 
   @override
   void initState() {
     super.initState();
-    _loadCheckoutRequests();
-  }
-
-  Future<void> _loadCheckoutRequests() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('checkoutRequests')
-          .where('status', isEqualTo: 'pending')
-          .orderBy('requestedAt', descending: true)
-          .get();
-
-      final requests = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'visitorId': data['visitorId'],
-          'visitorName': data['visitorName'],
-          'requestedBy': data['requestedBy'],
-          'requestedAt': data['requestedAt'],
-          'hostName': data['hostName'],
-        };
-      }).toList();
-
-      setState(() {
-        _checkoutRequests = requests;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading checkout requests: $e')),
-      );
-    }
+    // Initialize real-time stream
+    _checkoutRequestsStream = FirebaseFirestore.instance
+        .collection('checkoutRequests')
+        .where('status', isEqualTo: 'pending')
+        .orderBy('requestedAt', descending: true)
+        .snapshots();
   }
 
   Future<void> _approveCheckout(String requestId, String visitorId) async {
@@ -65,23 +30,9 @@ class _AdminCheckoutApprovalScreenState extends State<AdminCheckoutApprovalScree
           .doc(requestId)
           .update({'status': 'approved'});
 
-      // Update the visitor status and set checkout time
-      await FirebaseFirestore.instance
-          .collection('visitors')
-          .doc(visitorId)
-          .update({
-        'status': 'completed',
-        'checkOut': FieldValue.serverTimestamp(),
-      });
-
-      // Remove the approved request from the list
-      setState(() {
-        _checkoutRequests.removeWhere((request) => request['id'] == requestId);
-      });
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Checkout approved successfully'),
+          content: Text('Checkout request approved - Guard will be notified'),
           backgroundColor: Colors.green,
         ),
       );
@@ -102,11 +53,6 @@ class _AdminCheckoutApprovalScreenState extends State<AdminCheckoutApprovalScree
           .collection('checkoutRequests')
           .doc(requestId)
           .update({'status': 'rejected'});
-
-      // Remove the rejected request from the list
-      setState(() {
-        _checkoutRequests.removeWhere((request) => request['id'] == requestId);
-      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -129,69 +75,233 @@ class _AdminCheckoutApprovalScreenState extends State<AdminCheckoutApprovalScree
     return Scaffold(
       appBar: AppBar(
         title: const Text('Checkout Approval'),
+        actions: [
+          StreamBuilder<QuerySnapshot>(
+            stream: _checkoutRequestsStream,
+            builder: (context, snapshot) {
+              final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Center(
+                  child: Badge(
+                    label: Text('$count'),
+                    child: const Icon(Icons.pending_actions),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _checkoutRequests.isEmpty
-              ? const Center(child: Text('No pending checkout requests'))
-              : ListView.builder(
-                  itemCount: _checkoutRequests.length,
-                  itemBuilder: (context, index) {
-                    final request = _checkoutRequests[index];
-                    final requestedAt = request['requestedAt'] != null
-                        ? (request['requestedAt'] as Timestamp).toDate()
-                        : DateTime.now();
-                    
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Visitor: ${request['visitorName']}',
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _checkoutRequestsStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Error: ${snapshot.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _checkoutRequestsStream = FirebaseFirestore.instance
+                            .collection('checkoutRequests')
+                            .where('status', isEqualTo: 'pending')
+                            .orderBy('requestedAt', descending: true)
+                            .snapshots();
+                      });
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+          
+          if (docs.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+                  SizedBox(height: 16),
+                  Text(
+                    'No pending checkout requests',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'All checkout requests have been processed',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final requestedAt = data['requestedAt'] != null
+                  ? (data['requestedAt'] as Timestamp).toDate()
+                  : DateTime.now();
+              
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          // Profile picture
+                          FutureBuilder<DocumentSnapshot>(
+                            future: FirebaseFirestore.instance
+                                .collection('visitors')
+                                .doc(data['visitorId'])
+                                .get(),
+                            builder: (context, visitorSnapshot) {
+                              String? photoUrl;
+                              String? idImageUrl;
+                              String visitorInitial = (data['visitorName'] ?? 'U')[0].toUpperCase();
+                              
+                              if (visitorSnapshot.hasData && visitorSnapshot.data!.exists) {
+                                final visitorData = visitorSnapshot.data!.data() as Map<String, dynamic>?;
+                                photoUrl = visitorData?['photoUrl'];
+                                idImageUrl = visitorData?['idImageUrl'];
+                              }
+                              
+                              return CircleAvatar(
+                                radius: 20,
+                                backgroundColor: Colors.blue.shade100,
+                                backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                                    ? NetworkImage(photoUrl)
+                                    : (idImageUrl != null && idImageUrl.isNotEmpty)
+                                        ? NetworkImage(idImageUrl)
+                                        : null,
+                                child: ((photoUrl == null || photoUrl.isEmpty) && (idImageUrl == null || idImageUrl.isEmpty))
+                                    ? Text(
+                                        visitorInitial,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue.shade800,
+                                        ),
+                                      )
+                                    : null,
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(Icons.person, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Visitor: ${data['visitorName'] ?? 'Unknown'}',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text('Host: ${request['hostName']}'),
-                            Text('Requested by: ${request['requestedBy']}'),
-                            Text('Requested at: ${requestedAt.toString().substring(0, 16)}'),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                TextButton(
-                                  onPressed: () => _rejectCheckout(request['id']),
-                                  child: const Text('Reject'),
-                                ),
-                                const SizedBox(width: 16),
-                                ElevatedButton(
-                                  onPressed: () => _approveCheckout(
-                                    request['id'],
-                                    request['visitorId'],
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Approve Checkout'),
-                                ),
-                              ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ],
-                        ),
+                            child: Text(
+                              'PENDING',
+                              style: TextStyle(
+                                color: Colors.orange.shade800,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  },
+                      const SizedBox(height: 12),
+                      _buildInfoRow(Icons.business, 'Host', data['hostName'] ?? 'Unknown'),
+                      _buildInfoRow(Icons.security, 'Requested by', data['guardName'] ?? data['requestedBy'] ?? 'Guard'),
+                      _buildInfoRow(Icons.schedule, 'Requested at', _formatDateTime(requestedAt)),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => _rejectCheckout(doc.id),
+                            icon: const Icon(Icons.close, size: 18),
+                            label: const Text('Reject'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: () => _approveCheckout(
+                              doc.id,
+                              data['visitorId'],
+                            ),
+                            icon: const Icon(Icons.check, size: 18),
+                            label: const Text('Approve'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadCheckoutRequests,
-        child: const Icon(Icons.refresh),
+              );
+            },
+          );
+        },
       ),
     );
+  }
+  
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/visitor_model.dart';
 import '../services/visitor_service.dart';
 import '../models/host_model.dart';
@@ -66,34 +67,51 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final visitor = Visitor(
-        name: _nameController.text.trim(),
-        contact: _contactController.text.trim(),
-        email: _emailController.text.trim(),
-        purpose: _purposeController.text.trim(),
-        hostId: _selectedHostId!,
-        hostName: _selectedHostName!,
-        visitDate: DateTime.now(),
-        checkIn: DateTime.now(),
-        status: 'pending',
+      // Check if visitor already exists by contact or email
+      final existingVisitor = await _checkExistingVisitor(
+        _contactController.text.trim(),
+        _emailController.text.trim(),
       );
 
-      final visitorId = await _firebaseServices.addVisitor(visitor);
+      String visitorId;
+      String qrCode;
+      bool isNewVisitor = false;
 
-      if (!mounted) return;
+      if (existingVisitor != null) {
+        // Existing visitor - reuse their QR code and create new visit
+        visitorId = existingVisitor['id'];
+        qrCode = existingVisitor['qrCode'];
+        
+        await _createNewVisitForExistingVisitor(visitorId);
+        
+        if (!mounted) return;
+        
+        // Show message about reusing existing QR code
+        _showExistingVisitorDialog(existingVisitor, qrCode);
+      } else {
+        // New visitor - create new registration
+        isNewVisitor = true;
+        final visitor = Visitor(
+          name: _nameController.text.trim(),
+          contact: _contactController.text.trim(),
+          email: _emailController.text.trim(),
+          purpose: _purposeController.text.trim(),
+          hostId: _selectedHostId!,
+          hostName: _selectedHostName!,
+          visitDate: DateTime.now(),
+          checkIn: DateTime.now(),
+          status: 'pending',
+          isRegistered: true, // Mark as registered for permanent QR
+        );
 
-      // Show QR code dialog
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => QRCodeDialog(
-          qrData: visitorId,
-          visitorName: visitor.name,
-          visitorContact: visitor.contact,
-          visitorPurpose: visitor.purpose,
-          onDone: () => Navigator.popUntil(context, (route) => route.isFirst),
-        ),
-      );
+        visitorId = await _firebaseServices.addVisitor(visitor);
+        qrCode = visitorId; // QR code is the visitor ID
+
+        if (!mounted) return;
+
+        // Show QR code dialog for new visitor
+        _showQRCodeDialog(qrCode, visitor.name, visitor.contact, visitor.purpose, isNewVisitor);
+      }
 
       // Clear form
       _nameController.clear();
@@ -111,6 +129,201 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<Map<String, dynamic>?> _checkExistingVisitor(String contact, String email) async {
+    try {
+      // Check by contact first
+      var snapshot = await FirebaseFirestore.instance
+          .collection('visitors')
+          .where('contact', isEqualTo: contact)
+          .where('isRegistered', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        return {
+          'id': doc.id,
+          'qrCode': doc.data()['qrCode'] ?? doc.id,
+          'name': doc.data()['name'],
+          'contact': doc.data()['contact'],
+          'email': doc.data()['email'],
+        };
+      }
+
+      // Check by email if not found by contact
+      snapshot = await FirebaseFirestore.instance
+          .collection('visitors')
+          .where('email', isEqualTo: email)
+          .where('isRegistered', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        return {
+          'id': doc.id,
+          'qrCode': doc.data()['qrCode'] ?? doc.id,
+          'name': doc.data()['name'],
+          'contact': doc.data()['contact'],
+          'email': doc.data()['email'],
+        };
+      }
+
+      return null;
+    } catch (e) {
+      throw Exception('Failed to check existing visitor: $e');
+    }
+  }
+
+  Future<void> _createNewVisitForExistingVisitor(String visitorId) async {
+    try {
+      await _firebaseServices.startNewVisit(
+        visitorId,
+        newPurpose: _purposeController.text.trim(),
+        newHostId: _selectedHostId!,
+        newHostName: _selectedHostName!,
+      );
+    } catch (e) {
+      throw Exception('Failed to create new visit: $e');
+    }
+  }
+
+  void _showExistingVisitorDialog(Map<String, dynamic> existingVisitor, String qrCode) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.grey[850],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.person_pin, color: Colors.green, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Welcome Back!',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[100],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Existing visitor found:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      existingVisitor['name'],
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[100],
+                      ),
+                    ),
+                    Text(
+                      existingVisitor['contact'],
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[300],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              Text(
+                'You can use your existing QR code for this visit. New visit has been registered successfully!',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[300],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.popUntil(context, (route) => route.isFirst);
+                      },
+                      child: const Text('Done'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _showQRCodeDialog(
+                          qrCode,
+                          existingVisitor['name'],
+                          existingVisitor['contact'],
+                          _purposeController.text.trim(),
+                          false, // Not a new visitor
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Show QR Code'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showQRCodeDialog(String qrData, String visitorName, String visitorContact, String visitorPurpose, bool isNewVisitor) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => QRCodeDialog(
+        qrData: qrData,
+        visitorName: visitorName,
+        visitorContact: visitorContact,
+        visitorPurpose: visitorPurpose,
+        isNewVisitor: isNewVisitor,
+        onDone: () => Navigator.popUntil(context, (route) => route.isFirst),
+      ),
+    );
   }
 
   @override
@@ -385,6 +598,7 @@ class QRCodeDialog extends StatelessWidget {
   final String visitorName;
   final String visitorContact;
   final String visitorPurpose;
+  final bool isNewVisitor;
   final VoidCallback onDone;
 
   const QRCodeDialog({
@@ -393,6 +607,7 @@ class QRCodeDialog extends StatelessWidget {
     required this.visitorName,
     required this.visitorContact,
     required this.visitorPurpose,
+    this.isNewVisitor = true,
     required this.onDone,
   });
 
@@ -413,12 +628,14 @@ class QRCodeDialog extends StatelessWidget {
               children: [
                 Icon(Icons.qr_code, color: Colors.grey[300], size: 28),
                 const SizedBox(width: 12),
-                Text(
-                  'Visitor QR Code',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[100],
+                Expanded(
+                  child: Text(
+                    isNewVisitor ? 'Visitor QR Code' : 'Your Permanent QR Code',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[100],
+                    ),
                   ),
                 ),
               ],
@@ -472,13 +689,26 @@ class QRCodeDialog extends StatelessWidget {
             const SizedBox(height: 16),
             
             Text(
-              'Show this QR code to the guard for entry',
+              isNewVisitor 
+                  ? 'This is your permanent QR code. Save it for future visits to avoid re-registration!'
+                  : 'Use this same QR code for entry. Your new visit has been registered.',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[400],
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 8),
+            if (isNewVisitor)
+              Text(
+                '💡 Tip: Take a screenshot or save this QR code!',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.blue[300],
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
             const SizedBox(height: 24),
             
             // Done Button

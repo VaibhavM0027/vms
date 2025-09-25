@@ -66,6 +66,31 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    // Checkout Requests access control
+    match /checkoutRequests/{requestId} {
+      // Guards can create checkout requests
+      allow create: if isSignedIn() && getUserRole() == 'guard';
+      
+      // Guards can read their own checkout requests and listen for status changes
+      allow read: if isSignedIn() && (
+        getUserRole() == 'guard' ||
+        getUserRole() == 'admin' ||
+        getUserRole() == 'receptionist'
+      );
+      
+      // Admins and receptionists can update checkout request status (approve/reject/complete)
+      allow update: if isSignedIn() && (
+        getUserRole() == 'admin' ||
+        getUserRole() == 'receptionist' ||
+        (getUserRole() == 'guard' && 
+         request.resource.data.diff(resource.data).changedKeys().hasOnly(['status']) &&
+         request.resource.data.status == 'completed')
+      );
+      
+      // Only admins can delete checkout requests
+      allow delete: if isAdmin();
+    }
+
     // Notifications access control
     match /notifications/{notificationId} {
       function isNotificationRecipient() {
@@ -91,6 +116,22 @@ service cloud.firestore {
 
       // Admin can delete any; recipient can delete their own
       allow delete: if isAdmin() || isNotificationRecipient();
+    }
+  }
+}
+
+// Firebase Storage Rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow public read access to visitor photos and ID images
+    match /visitor_photos/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    match /visitor_ids/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/visitor_model.dart';
-import '../services/visitor_service.dart';
 import '../services/notification_service.dart';
 
 class VisitorStatusScreen extends StatefulWidget {
@@ -156,6 +155,28 @@ class _VisitorStatusScreenState extends State<VisitorStatusScreen> {
                     ),
                     child: Column(
                       children: [
+                        // Profile picture
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                              ? NetworkImage(visitor.photoUrl!)
+                              : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                                  ? NetworkImage(visitor.idImageUrl!)
+                                  : null,
+                          child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
+                              ? Text(
+                                  visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+                        // Status icon and text
                         Icon(
                           _getStatusIcon(status),
                           size: 80,

@@ -13,6 +13,7 @@ import 'user_registration_screen.dart';
 import 'guard_register_visitor_screen.dart';
 import 'all_visitor_history_screen.dart';
 import 'entry_exit_history_screen.dart';
+import 'admin_checkout_approval_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/notification_service.dart';
@@ -227,6 +228,13 @@ class DashboardScreen extends StatelessWidget {
                 Icons.person_add_alt,
                 'Register User',
                 const UserRegistrationScreen(),
+              ),
+            if (role == 'admin')
+              _buildDashboardItem(
+                context,
+                Icons.approval,
+                'Checkout Approvals',
+                const AdminCheckoutApprovalScreen(),
               ),
             if (role == 'admin')
               _buildDashboardItem(
