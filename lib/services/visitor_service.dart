@@ -184,6 +184,7 @@ class FirebaseServices {
       // Get the visitor document
       final visitorDoc = await _firestore.collection('visitors').doc(visitorId).get();
       final visitorData = visitorDoc.data();
+      final now = Timestamp.now();
       
       if (visitorData != null && visitorData['isRegistered'] == true) {
         // For registered visitors, update the current visit in history
@@ -193,7 +194,7 @@ class FirebaseServices {
             
         if (history.isNotEmpty) {
           // Update the most recent visit
-          history.last['checkIn'] = FieldValue.serverTimestamp();
+          history.last['checkIn'] = now;
           history.last['status'] = 'checked-in';
         }
         
@@ -220,6 +221,7 @@ class FirebaseServices {
       final visitorDoc = await _firestore.collection('visitors').doc(visitorId).get();
       final visitorData = visitorDoc.data();
       final checkOutTime = FieldValue.serverTimestamp();
+      final now = Timestamp.now();
       
       if (visitorData != null && visitorData['isRegistered'] == true) {
         // For registered visitors, update the current visit in history
@@ -229,7 +231,7 @@ class FirebaseServices {
             
         if (history.isNotEmpty) {
           // Update the most recent visit
-          history.last['checkOut'] = checkOutTime;
+          history.last['checkOut'] = now;
           history.last['status'] = 'completed';
           history.last['meetingNotes'] = meetingNotes;
         }
@@ -399,14 +401,15 @@ class FirebaseServices {
             ? List.from(data['visitHistory'])
             : [];
             
+        final now = Timestamp.now();
         final newVisit = {
-          'checkIn': FieldValue.serverTimestamp(),
+          'checkIn': now,
           'checkOut': null,
           'purpose': newPurpose ?? data['purpose'] ?? 'Visit',
           'hostId': newHostId ?? data['hostId'],
           'hostName': newHostName ?? data['hostName'],
           'status': 'pending', // New visits start as pending
-          'visitDate': FieldValue.serverTimestamp(),
+          'visitDate': now,
         };
         history.add(newVisit);
         

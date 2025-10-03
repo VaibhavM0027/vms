@@ -2,9 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/config_service.dart';
 import 'guard_register_visitor_screen.dart';
-import 'guard_checkout_request_screen.dart';
 
 class GuardScanScreen extends StatefulWidget {
   const GuardScanScreen({super.key});
@@ -129,7 +129,8 @@ class _GuardScanScreenState extends State<GuardScanScreen> {
             
         if (history.isNotEmpty) {
           // Update the most recent visit
-          history.last['checkIn'] = FieldValue.serverTimestamp();
+          final now = Timestamp.now();
+          history.last['checkIn'] = now;
           history.last['status'] = 'checked-in';
         }
         
@@ -259,10 +260,11 @@ class _GuardScanScreenState extends State<GuardScanScreen> {
         List<Map<String, dynamic>> history = visitorData['visitHistory'] != null 
             ? List.from(visitorData['visitHistory'])
             : [];
+        final now = Timestamp.now();
             
         if (history.isNotEmpty) {
           // Update the most recent visit
-          history.last['checkIn'] = FieldValue.serverTimestamp();
+          history.last['checkIn'] = now;
           history.last['status'] = 'checked-in';
         }
         
@@ -425,10 +427,11 @@ class _GuardScanScreenState extends State<GuardScanScreen> {
           List<Map<String, dynamic>> history = visitorData['visitHistory'] != null 
               ? List.from(visitorData['visitHistory'])
               : [];
+          final now = Timestamp.now();
               
           if (history.isNotEmpty) {
             // Update the most recent visit
-            history.last['checkOut'] = checkOutTime;
+            history.last['checkOut'] = now;
             history.last['status'] = 'completed';
           }
           
@@ -498,14 +501,15 @@ class _GuardScanScreenState extends State<GuardScanScreen> {
             : [];
             
         // Add new visit to history (starting as pending for approval)
+        final now = Timestamp.now();
         final newVisit = {
-          'checkIn': FieldValue.serverTimestamp(),
+          'checkIn': now,
           'checkOut': null,
           'purpose': visitorData['purpose'] ?? 'Visit',
           'hostId': visitorData['hostId'],
           'hostName': visitorData['hostName'],
           'status': 'pending',
-          'visitDate': FieldValue.serverTimestamp(),
+          'visitDate': now,
         };
         history.add(newVisit);
         
@@ -677,29 +681,7 @@ class _GuardScanScreenState extends State<GuardScanScreen> {
               ],
             ),
           ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                // Navigate to checkout request screen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const GuardCheckoutRequestScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.logout),
-              label: const Text('Request Visitor Checkout'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                minimumSize: const Size(double.infinity, 48),
-              ),
-            ),
-          ),
+
         ],
       ),
     );

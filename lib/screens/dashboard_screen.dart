@@ -194,13 +194,7 @@ class DashboardScreen extends StatelessWidget {
                 'Guard Scan',
                 const GuardScanScreen(),
               ),
-            if (role == 'guard' || role == 'admin')
-              _buildDashboardItem(
-                context,
-                Icons.app_registration,
-                'Register Visitor',
-                const GuardRegisterVisitorScreen(),
-              ),
+
             if (role == 'admin' || role == 'host')
               _buildDashboardItem(
                 context,

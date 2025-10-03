@@ -123,27 +123,91 @@ class _PreRegisterScreenState extends State<PreRegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Create visitor document
-      final docRef = FirebaseFirestore.instance.collection('visitors').doc();
-      final id = docRef.id;
+      // Check if a registered visitor already exists by contact number
+      final existingVisitorQuery = await FirebaseFirestore.instance
+          .collection('visitors')
+          .where('contact', isEqualTo: _contactController.text.trim())
+          .where('isRegistered', isEqualTo: true)
+          .limit(1)
+          .get();
+      
+      String qrCode;
+      String visitorId;
+      
+      if (existingVisitorQuery.docs.isNotEmpty) {
+        // Existing registered visitor found - reuse their QR code
+        final existingDoc = existingVisitorQuery.docs.first;
+        final existingData = existingDoc.data();
+        visitorId = existingDoc.id;
+        qrCode = existingData['qrCode'] ?? visitorId;
+        
+        // Add new visit to their history
+        List<Map<String, dynamic>> history = existingData['visitHistory'] != null 
+            ? List.from(existingData['visitHistory'])
+            : [];
+            
+        final newVisit = {
+          'checkIn': null,
+          'checkOut': null,
+          'purpose': _purposeController.text.trim(),
+          'hostId': _selectedHostId!,
+          'hostName': _selectedHostName!,
+          'status': 'pending',
+          'visitDate': _visitDateTime,
+        };
+        history.add(newVisit);
+        
+        // Update visitor document with new visit
+        await FirebaseFirestore.instance
+            .collection('visitors')
+            .doc(visitorId)
+            .update({
+          'name': _nameController.text.trim(),
+          'purpose': _purposeController.text.trim(),
+          'hostId': _selectedHostId!,
+          'hostName': _selectedHostName!,
+          'visitDate': _visitDateTime,
+          'checkIn': null,
+          'checkOut': null,
+          'status': 'pending',
+          'visitHistory': history,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        
+      } else {
+        // New visitor - create with permanent QR code
+        final docRef = FirebaseFirestore.instance.collection('visitors').doc();
+        visitorId = docRef.id;
+        qrCode = docRef.id;
 
-      final visitorData = {
-        'name': _nameController.text.trim(),
-        'contact': _contactController.text.trim(),
-        'email': '',
-        'purpose': _purposeController.text.trim(),
-        'hostId': _selectedHostId!,
-        'hostName': _selectedHostName!,
-        'visitDate': _visitDateTime,
-        'checkIn': null,
-        'checkOut': null,
-        'meetingNotes': null,
-        'status': 'pending',
-        'qrCode': id,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+        final visitorData = {
+          'name': _nameController.text.trim(),
+          'contact': _contactController.text.trim(),
+          'email': '',
+          'purpose': _purposeController.text.trim(),
+          'hostId': _selectedHostId!,
+          'hostName': _selectedHostName!,
+          'visitDate': _visitDateTime,
+          'checkIn': null,
+          'checkOut': null,
+          'meetingNotes': null,
+          'status': 'pending',
+          'qrCode': qrCode,
+          'isRegistered': true, // Mark as registered for permanent QR
+          'visitHistory': [{
+            'checkIn': null,
+            'checkOut': null,
+            'purpose': _purposeController.text.trim(),
+            'hostId': _selectedHostId!,
+            'hostName': _selectedHostName!,
+            'status': 'pending',
+            'visitDate': _visitDateTime,
+          }],
+          'createdAt': FieldValue.serverTimestamp(),
+        };
 
-      await docRef.set(visitorData);
+        await docRef.set(visitorData);
+      }
 
       if (!mounted) return;
 
@@ -152,7 +216,7 @@ class _PreRegisterScreenState extends State<PreRegisterScreen> {
         context: context,
         barrierDismissible: false,
         builder: (context) => QRCodeDialog(
-          qrData: id,
+          qrData: qrCode,
           visitorName: _nameController.text.trim(),
           visitorContact: _contactController.text.trim(),
           visitorPurpose: _purposeController.text.trim(),

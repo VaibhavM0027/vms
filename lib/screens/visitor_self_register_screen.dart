@@ -51,44 +51,115 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final now = DateTime.now();
-      final docRef = FirebaseFirestore.instance.collection('visitors').doc();
+      // Check if a registered visitor already exists by contact number
+      final existingVisitorQuery = await FirebaseFirestore.instance
+          .collection('visitors')
+          .where('contact', isEqualTo: _contactController.text.trim())
+          .where('isRegistered', isEqualTo: true)
+          .limit(1)
+          .get();
+      
+      String qrCode;
+      String visitorId;
+      
+      if (existingVisitorQuery.docs.isNotEmpty) {
+        // Existing registered visitor found - reuse their QR code
+        final existingDoc = existingVisitorQuery.docs.first;
+        final existingData = existingDoc.data();
+        visitorId = existingDoc.id;
+        qrCode = existingData['qrCode'] ?? visitorId;
+        
+        // Add new visit to their history
+        final now = DateTime.now();
+        List<Map<String, dynamic>> history = existingData['visitHistory'] != null 
+            ? List.from(existingData['visitHistory'])
+            : [];
+            
+        final newVisit = {
+          'checkIn': now,
+          'checkOut': null,
+          'purpose': _purposeController.text.trim(),
+          'hostId': '',
+          'hostName': _hostNameController.text.trim(),
+          'status': 'pending',
+          'visitDate': now,
+        };
+        history.add(newVisit);
+        
+        // Update visitor document with new visit
+        await FirebaseFirestore.instance
+            .collection('visitors')
+            .doc(visitorId)
+            .update({
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'hostName': _hostNameController.text.trim(),
+          'purpose': _purposeController.text.trim(),
+          'visitDate': now,
+          'checkIn': now,
+          'checkOut': null,
+          'status': 'pending',
+          'visitHistory': history,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        
+      } else {
+        // New visitor - create with permanent QR code
+        final now = DateTime.now();
+        final docRef = FirebaseFirestore.instance.collection('visitors').doc();
+        visitorId = docRef.id;
+        qrCode = docRef.id;
 
-      final visitorData = {
-        'name': _nameController.text.trim(),
-        'contact': _contactController.text.trim(),
-        'email': _emailController.text.trim(),
-        'hostName': _hostNameController.text.trim(),
-        'purpose': _purposeController.text.trim(),
-        'hostId': '',
-        'visitDate': now,
-        'checkIn': now,
-        'checkOut': null,
-        'meetingNotes': null,
-        'status': 'pending',
-        'qrCode': docRef.id,
-        'photoUrl': null,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+        final visitorData = {
+          'name': _nameController.text.trim(),
+          'contact': _contactController.text.trim(),
+          'email': _emailController.text.trim(),
+          'hostName': _hostNameController.text.trim(),
+          'purpose': _purposeController.text.trim(),
+          'hostId': '',
+          'visitDate': now,
+          'checkIn': now,
+          'checkOut': null,
+          'meetingNotes': null,
+          'status': 'pending',
+          'qrCode': qrCode,
+          'photoUrl': null,
+          'isRegistered': true, // Mark as registered for permanent QR
+          'visitHistory': [{
+            'checkIn': now,
+            'checkOut': null,
+            'purpose': _purposeController.text.trim(),
+            'hostId': '',
+            'hostName': _hostNameController.text.trim(),
+            'status': 'pending',
+            'visitDate': now,
+          }],
+          'createdAt': FieldValue.serverTimestamp(),
+        };
 
-      await docRef.set(visitorData);
+        await docRef.set(visitorData);
+      }
 
       if (!mounted) return;
 
       setState(() {
         _isSubmitting = false;
-        _lastGeneratedQR = docRef.id; // Store the QR code
+        _lastGeneratedQR = qrCode; // Store the QR code
       });
-      _showQRCodeDialog(docRef.id);
+      _showQRCodeDialog(qrCode, existingVisitorQuery.docs.isNotEmpty);
 
+      // Upload photo
       () async {
         try {
           final ref = FirebaseStorage.instance
               .ref()
-              .child('visitor_photos/${docRef.id}.jpg');
+              .child('visitor_photos/$visitorId.jpg');
           await ref.putFile(_photo!);
           final url = await ref.getDownloadURL();
-          await docRef.update({'photoUrl': url});
+          await FirebaseFirestore.instance
+              .collection('visitors')
+              .doc(visitorId)
+              .update({'photoUrl': url});
         } catch (_) {}
       }();
     } catch (e) {
@@ -101,21 +172,23 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
     }
   }
 
-  void _showQRCodeDialog(String qrData) {
+  void _showQRCodeDialog(String qrData, [bool isExistingVisitor = false]) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.grey[850],
-        title: const Text(
-          'Registration Successful!',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          isExistingVisitor ? 'Welcome Back!' : 'Registration Successful!',
+          style: const TextStyle(color: Colors.white),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Your QR Code has been generated. Please show this to the guard.',
+              isExistingVisitor 
+                  ? 'Your permanent QR Code is ready. You can reuse this QR code for future visits!'
+                  : 'Your permanent QR Code has been generated. Save this for future visits!',
               style: TextStyle(color: Colors.grey[300]),
             ),
             const SizedBox(height: 20),
@@ -142,6 +215,17 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            if (isExistingVisitor)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'New visit registered successfully!',
+                  style: TextStyle(
+                    color: Colors.green[300],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
           ],
         ),
         actions: [
