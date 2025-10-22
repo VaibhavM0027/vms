@@ -10,9 +10,7 @@ import 'visitor_self_register_screen.dart';
 import 'host_management_screen.dart';
 import 'notifications_screen.dart';
 import 'user_registration_screen.dart';
-import 'guard_register_visitor_screen.dart';
 import 'all_visitor_history_screen.dart';
-import 'entry_exit_history_screen.dart';
 import 'admin_checkout_approval_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
@@ -112,6 +110,36 @@ class DashboardScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           _buildNotificationButton(context, role),
+          // User profile section
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.grey[700],
+                  child: Text(
+                    auth.username != null && auth.username!.isNotEmpty 
+                        ? auth.username![0].toUpperCase() 
+                        : 'U',
+                    style: const TextStyle(
+                      fontSize: 16, 
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  auth.username ?? 'User',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -172,13 +200,6 @@ class DashboardScreen extends StatelessWidget {
                 Icons.history,
                 'Visitor History',
                 const AllVisitorHistoryScreen(),
-              ),
-            if (role == 'admin' || role == 'receptionist')
-              _buildDashboardItem(
-                context,
-                Icons.timeline,
-                'Entry/Exit History',
-                const EntryExitHistoryScreen(),
               ),
             // Checkout button for all roles (admin, receptionist, visitor)
             _buildDashboardItem(

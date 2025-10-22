@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/visitor_model.dart';
 import 'visitor_history_screen.dart';
+import '../widgets/visitor_photo_widget.dart';
 
 class AllVisitorHistoryScreen extends StatefulWidget {
   const AllVisitorHistoryScreen({Key? key}) : super(key: key);
@@ -282,22 +283,15 @@ class _AllVisitorHistoryScreenState extends State<AllVisitorHistoryScreen> {
       child: ListTile(
         leading: Stack(
           children: [
-            CircleAvatar(
-              backgroundColor: statusColor.withOpacity(0.2),
-              backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
-                  ? NetworkImage(visitor.photoUrl!)
+            VisitorPhotoWidget(
+              photoUrl: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                  ? visitor.photoUrl!
                   : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
-                      ? NetworkImage(visitor.idImageUrl!)
+                      ? visitor.idImageUrl!
                       : null,
-              child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
-                  ? Text(
-                      visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                    )
-                  : null,
+              height: 40,
+              width: 40,
+              enableEnlarge: false,
             ),
             if (hasHistory)
               Positioned(

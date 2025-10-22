@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../models/visitor_model.dart';
 import '../services/visitor_service.dart';
 import '../models/host_model.dart';
 import '../services/host_service.dart';
 import '../utils/validation_helper.dart';
+import '../widgets/visitor_photo_widget.dart';
+import '../utils/error_handler.dart';
 
 class VisitorRegistrationScreen extends StatefulWidget {
   final String? idImagePath;
@@ -20,6 +24,7 @@ class VisitorRegistrationScreen extends StatefulWidget {
 class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
   final FirebaseServices _firebaseServices = FirebaseServices();
   final HostService _hostService = HostService();
+  final ImagePicker _picker = ImagePicker();
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _contactController = TextEditingController();
@@ -29,6 +34,8 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
   String? _selectedHostName;
   List<Host> _hosts = [];
   bool _isLoading = false;
+  File? _visitorPhoto;
+  String? _visitorPhotoUrl;
 
   @override
   void initState() {
@@ -67,6 +74,23 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Upload visitor photo if captured
+      if (_visitorPhoto != null) {
+        try {
+          _visitorPhotoUrl = await _firebaseServices.uploadVisitorPhoto(
+            DateTime.now().millisecondsSinceEpoch.toString(), // temporary ID
+            _visitorPhoto!.path,
+          );
+        } on Exception catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Photo upload failed: ${e.toString()}')),
+            );
+          }
+          // Continue with registration even if photo upload fails
+        }
+      }
+
       // Check if visitor already exists by contact or email
       final existingVisitor = await _checkExistingVisitor(
         _contactController.text.trim(),
@@ -90,7 +114,6 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
         _showExistingVisitorDialog(existingVisitor, qrCode);
       } else {
         // New visitor - create new registration
-        isNewVisitor = true;
         final visitor = Visitor(
           name: _nameController.text.trim(),
           contact: _contactController.text.trim(),
@@ -102,10 +125,46 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
           checkIn: DateTime.now(),
           status: 'pending',
           isRegistered: true, // Mark as registered for permanent QR
+          photoUrl: _visitorPhotoUrl, // Add photo URL to visitor
         );
 
         visitorId = await _firebaseServices.addVisitor(visitor);
         qrCode = visitorId; // QR code is the visitor ID
+
+        // Upload visitor photo with correct visitor ID if captured
+        if (_visitorPhoto != null) {
+          try {
+            final photoUrl = await _firebaseServices.uploadVisitorPhoto(
+              visitorId,
+              _visitorPhoto!.path,
+            );
+            
+            // Update visitor with photo URL
+            await _firebaseServices.updateVisitor(
+              Visitor(
+                id: visitorId,
+                name: visitor.name,
+                contact: visitor.contact,
+                email: visitor.email,
+                purpose: visitor.purpose,
+                hostId: visitor.hostId,
+                hostName: visitor.hostName,
+                visitDate: visitor.visitDate,
+                checkIn: visitor.checkIn,
+                status: visitor.status,
+                isRegistered: visitor.isRegistered,
+                photoUrl: photoUrl, // Updated photo URL
+              ),
+            );
+          } on Exception catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Photo upload failed after registration: ${e.toString()}')),
+              );
+            }
+            // Continue with registration even if photo upload fails
+          }
+        }
 
         if (!mounted) return;
 
@@ -121,10 +180,15 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
       setState(() {
         _selectedHostId = null;
         _selectedHostName = null;
+        _visitorPhoto = null;
+        _visitorPhotoUrl = null;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+      // Handle the error with proper error handling
+      await ErrorHandler.handleError(
+        context: context,
+        error: e,
+        showSnackBar: true,
       );
     } finally {
       setState(() => _isLoading = false);
@@ -173,6 +237,10 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
 
       return null;
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to check for existing visitors. Please contact an administrator.');
+      }
       throw Exception('Failed to check existing visitor: $e');
     }
   }
@@ -186,6 +254,10 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
         newHostName: _selectedHostName!,
       );
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to create a new visit. Please contact an administrator.');
+      }
       throw Exception('Failed to create new visit: $e');
     }
   }
@@ -326,6 +398,24 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
     );
   }
 
+  Future<void> _captureVisitorPhoto() async {
+    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+    if (photo != null) {
+      setState(() {
+        _visitorPhoto = File(photo.path);
+      });
+    }
+  }
+
+  Future<void> _selectVisitorPhoto() async {
+    final XFile? photo = await _picker.pickImage(source: ImageSource.gallery);
+    if (photo != null) {
+      setState(() {
+        _visitorPhoto = File(photo.path);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -371,6 +461,85 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                       Text(
                         'Enter visitor details to generate QR code',
                         style: TextStyle(fontSize: 16, color: Colors.grey[400]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Photo Capture Section
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[850]!,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.grey[800]!.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Visitor Photo',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[100], fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Photo Preview or Placeholder
+                      Center(
+                        child: _visitorPhoto != null
+                            ? VisitorPhotoWidget(
+                                photoUrl: '',
+                                height: 150,
+                                width: 150,
+                                enableEnlarge: true,
+                                heroTag: 'visitor_photo_preview',
+                              )
+                            : Container(
+                                height: 150,
+                                width: 150,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[700],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey[600]!),
+                                ),
+                                child: Icon(
+                                  Icons.camera_alt,
+                                  size: 40,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Photo Capture Options
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _captureVisitorPhoto,
+                            icon: Icon(Icons.camera, color: Colors.grey[300]),
+                            label: Text(
+                              'Capture',
+                              style: TextStyle(color: Colors.grey[300]),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          TextButton.icon(
+                            onPressed: _selectVisitorPhoto,
+                            icon: Icon(Icons.photo_library, color: Colors.grey[300]),
+                            label: Text(
+                              'Gallery',
+                              style: TextStyle(color: Colors.grey[300]),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap image or buttons to capture visitor photo (Optional)',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                         textAlign: TextAlign.center,
                       ),
                     ],

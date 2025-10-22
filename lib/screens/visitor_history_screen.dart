@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/visitor_model.dart';
+import '../widgets/visitor_photo_widget.dart';
 
 class VisitorHistoryScreen extends StatelessWidget {
   final String visitorId;
@@ -88,6 +89,19 @@ class VisitorHistoryScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Display visitor photo if available
+                      VisitorPhotoWidget(
+                        photoUrl: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                            ? visitor.photoUrl!
+                            : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                                ? visitor.idImageUrl!
+                                : null,
+                        height: 100,
+                        width: 100,
+                        enableEnlarge: true,
+                        heroTag: 'visitor_history_photo_${visitor.id}',
+                      ),
+                      const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [

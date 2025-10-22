@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../widgets/qr_code_widget.dart';
 
 class VisitorSelfRegisterScreen extends StatefulWidget {
@@ -151,6 +152,16 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
       // Upload photo
       () async {
         try {
+          final connectivityResult = await Connectivity().checkConnectivity();
+          if (connectivityResult == ConnectivityResult.none) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No internet connection. Photo will be uploaded when online.')),
+              );
+            }
+            return;
+          }
+          
           final ref = FirebaseStorage.instance
               .ref()
               .child('visitor_photos/$visitorId.jpg');
@@ -160,8 +171,27 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
               .collection('visitors')
               .doc(visitorId)
               .update({'photoUrl': url});
-        } catch (_) {}
+        } on FirebaseException catch (e) {
+          if (mounted) {
+            if (e.code == 'unauthenticated' || e.code == 'permission-denied') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Photo upload requires authentication. Please contact reception.')),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Photo upload failed: ${e.message}')),
+              );
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Photo upload failed: $e')),
+            );
+          }
+        }
       }();
+
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);

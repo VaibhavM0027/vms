@@ -151,6 +151,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   style: TextStyle(fontSize: 24, color: Colors.grey[100], fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
+                // Display visitor photo if available
+                if ((visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty) || (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)) ...[
+                  Center(
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                          ? NetworkImage(visitor.photoUrl!)
+                          : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                              ? NetworkImage(visitor.idImageUrl!)
+                              : null,
+                      child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
+                          ? Text(
+                              visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 32),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 _buildInfoRow(Icons.person, 'Name: ${visitor.name}'),
                 _buildInfoRow(Icons.work, 'Host: ${visitor.hostName}'),
                 _buildInfoRow(Icons.description, 'Purpose: ${visitor.purpose}'),

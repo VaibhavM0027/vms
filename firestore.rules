@@ -27,9 +27,14 @@ service cloud.firestore {
       allow read, write: if isAdmin() || (isSignedIn() && getUserRole() == 'receptionist');
 
       // Visitor: can create own registration and read/update own records
-      allow read, create: if true; // Allow public visitor registration
+      // Allow public visitor registration for self-registration
+      allow read: if true;
+      allow create: if true || isSignedIn(); // Allow both authenticated and unauthenticated users to create
+      
+      // Allow updates for authenticated users (visitors updating their own records)
       allow update: if isSignedIn() && 
-        (getUserRole() == 'visitor' || getUserRole() == 'guard' || getUserRole() == 'host');
+        (getUserRole() == 'visitor' || getUserRole() == 'guard' || getUserRole() == 'host' || 
+         getUserRole() == 'receptionist' || isAdmin());
 
       // Guard: can update checkIn/checkOut
       allow update: if isSignedIn() && getUserRole() == 'guard';
@@ -59,7 +64,8 @@ service cloud.firestore {
     }
 
     match /hosts/{hostId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && getUserRole() == 'receptionist');
     }
 
     match /visits/{visitId} {
@@ -126,14 +132,18 @@ service firebase.storage {
     // Allow public read access to visitor photos and ID images
     match /visitor_photos/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      // Allow write for authenticated users (receptionists, guards, etc.)
+      // and for direct visitor uploads (limited by client-side validation)
+      allow write: if request.auth != null || 
+                   request.resource.size < 5 * 1024 * 1024; // 5MB limit
     }
     
     match /visitor_ids/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      // Allow write for authenticated users (receptionists, guards, etc.)
+      // and for direct visitor uploads (limited by client-side validation)
+      allow write: if request.auth != null || 
+                   request.resource.size < 5 * 1024 * 1024; // 5MB limit
     }
   }
 }
-
-

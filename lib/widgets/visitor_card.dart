@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/visitor_model.dart';
+import 'visitor_photo_widget.dart';
 
 class VisitorCard extends StatelessWidget {
   final Visitor visitor;
@@ -16,20 +17,15 @@ class VisitorCard extends StatelessWidget {
       color: Colors.grey[850],
       child: ListTile(
         onTap: onTap,
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: Colors.grey[300],
-          backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
-              ? NetworkImage(visitor.photoUrl!)
+        leading: VisitorPhotoWidget(
+          photoUrl: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+              ? visitor.photoUrl!
               : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
-                  ? NetworkImage(visitor.idImageUrl!)
+                  ? visitor.idImageUrl!
                   : null,
-          child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
-              ? Text(
-                  visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                )
-              : null,
+          height: 48,
+          width: 48,
+          enableEnlarge: false,
         ),
         title: Text(
           visitor.name,

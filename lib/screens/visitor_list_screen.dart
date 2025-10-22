@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import 'visitor_details_screen.dart';
 import 'checkout_screen.dart';
 import 'visitor_history_screen.dart';
+import '../widgets/visitor_photo_widget.dart';
 
 class VisitorListScreen extends StatefulWidget {
   const VisitorListScreen({super.key});
@@ -218,20 +219,15 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                                   Row(
                                     children: [
                                       // Profile picture
-                                      CircleAvatar(
-                                        radius: 20,
-                                        backgroundColor: Colors.grey[300],
-                                        backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
-                                            ? NetworkImage(visitor.photoUrl!)
+                                      VisitorPhotoWidget(
+                                        photoUrl: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                                            ? visitor.photoUrl!
                                             : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
-                                                ? NetworkImage(visitor.idImageUrl!)
+                                                ? visitor.idImageUrl!
                                                 : null,
-                                        child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
-                                            ? Text(
-                                                visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                              )
-                                            : null,
+                                        height: 40,
+                                        width: 40,
+                                        enableEnlarge: false,
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(

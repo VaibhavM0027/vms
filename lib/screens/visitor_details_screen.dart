@@ -2,14 +2,81 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/visitor_model.dart';
 import '../services/visitor_service.dart';
+import '../services/pdf_service.dart';
 import 'checkout_screen.dart';
 import '../widgets/qr_code_widget.dart';
+import '../widgets/visitor_photo_widget.dart';
 
 class VisitorDetailsScreen extends StatelessWidget {
   final Visitor visitor;
   final FirebaseServices _firebaseServices = FirebaseServices();
 
   VisitorDetailsScreen({super.key, required this.visitor});
+
+  // Function to show enlarged photo dialog
+  void _showEnlargedPhoto(BuildContext context, String photoUrl) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        photoUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
+                            width: 200,
+                            color: Colors.grey[800],
+                            child: const Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Colors.grey,
+                                size: 50,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Tap to close',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,14 +154,19 @@ class VisitorDetailsScreen extends StatelessWidget {
                     _buildStatusChip(visitor.status),
                     if ((visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty) || (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)) ...[
                       const SizedBox(height: 16),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty) ? visitor.photoUrl! : visitor.idImageUrl!,
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
+                      VisitorPhotoWidget(
+                        photoUrl: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty) 
+                            ? visitor.photoUrl! 
+                            : visitor.idImageUrl!,
+                        height: 180,
+                        width: double.infinity,
+                        enableEnlarge: true,
+                        heroTag: 'visitor_details_photo_${visitor.id}',
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap to enlarge photo',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[400]),
                       ),
                     ],
                   ],
@@ -206,6 +278,19 @@ class VisitorDetailsScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _downloadIdCard(context, visitor),
+                  icon: Icon(Icons.download),
+                  label: Text('Download ID Card (PDF)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green[700],
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -373,5 +458,29 @@ class VisitorDetailsScreen extends StatelessWidget {
         onDone: () => Navigator.of(ctx).pop(),
       ),
     );
+  }
+
+  void _downloadIdCard(BuildContext context, Visitor visitor) async {
+    try {
+      await PdfService.downloadAndOpenVisitorIdCard(visitor);
+      if (!context.mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('ID card downloaded and opened successfully!'),
+          backgroundColor: Colors.green[700],
+        ),
+      );
+    } catch (e) {
+      print('Error downloading ID card: $e');
+      if (!context.mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to download ID card. Please try again.'),
+          backgroundColor: Colors.red[700],
+        ),
+      );
+    }
   }
 }

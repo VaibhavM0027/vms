@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/visitor_model.dart';
 
 class FirebaseServices {
@@ -134,6 +135,10 @@ class FirebaseServices {
         return docRef.id;
       }
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to register visitors. Please contact an administrator.');
+      }
       throw Exception('Failed to add visitor: $e');
     }
   }
@@ -153,6 +158,10 @@ class FirebaseServices {
       }
       return null;
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to search for visitors. Please contact an administrator.');
+      }
       throw Exception('Failed to find visitor: $e');
     }
   }
@@ -164,6 +173,10 @@ class FirebaseServices {
         'approvedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to approve visitors. Please contact an administrator.');
+      }
       throw Exception('Failed to approve visitor: $e');
     }
   }
@@ -175,6 +188,10 @@ class FirebaseServices {
         'rejectedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to reject visitors. Please contact an administrator.');
+      }
       throw Exception('Failed to reject visitor: $e');
     }
   }
@@ -211,6 +228,10 @@ class FirebaseServices {
         });
       }
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to check in visitors. Please contact an administrator.');
+      }
       throw Exception('Failed to check-in visitor: $e');
     }
   }
@@ -251,6 +272,10 @@ class FirebaseServices {
         });
       }
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to check out visitors. Please contact an administrator.');
+      }
       throw Exception('Failed to check-out visitor: $e');
     }
   }
@@ -355,6 +380,10 @@ class FirebaseServices {
       }
       return null;
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to search for visitors by QR code. Please contact an administrator.');
+      }
       throw Exception('Failed to fetch visitor by QR code: $e');
     }
   }
@@ -439,6 +468,10 @@ class FirebaseServices {
         });
       }
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to start a new visit. Please contact an administrator.');
+      }
       throw Exception('Failed to start new visit: $e');
     }
   }
@@ -446,22 +479,46 @@ class FirebaseServices {
   // Image Upload
   Future<String> uploadIdImage(String visitorId, String filePath) async {
     try {
+      // Check connectivity first
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) {
+        throw Exception('No internet connection. Please check your network and try again.');
+      }
+      
       final file = File(filePath);
       final ref = _storage.ref().child('visitor_ids/$visitorId.jpg');
       await ref.putFile(file);
       return await ref.getDownloadURL();
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to upload ID images. Please contact an administrator.');
+      }
       throw Exception('Failed to upload image: $e');
     }
   }
 
   Future<String> uploadVisitorPhoto(String visitorId, String filePath) async {
     try {
+      // Check connectivity first
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) {
+        throw Exception('No internet connection. Please check your network and try again.');
+      }
+      
       final file = File(filePath);
       final ref = _storage.ref().child('visitor_photos/$visitorId.jpg');
       await ref.putFile(file);
       return await ref.getDownloadURL();
     } catch (e) {
+      // Handle permission errors specifically
+      if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('You do not have permission to upload visitor photos. Please contact an administrator.');
+      }
+      // Handle unauthenticated access
+      if (e.toString().contains('unauthenticated') || e.toString().contains('auth')) {
+        throw Exception('Authentication required. Please contact reception for assistance.');
+      }
       throw Exception('Failed to upload photo: $e');
     }
   }
