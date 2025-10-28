@@ -115,17 +115,26 @@ class DashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.grey[700],
-                  child: Text(
-                    auth.username != null && auth.username!.isNotEmpty 
-                        ? auth.username![0].toUpperCase() 
-                        : 'U',
-                    style: const TextStyle(
-                      fontSize: 16, 
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.grey[700],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Center(
+                      child: Text(
+                        auth.username != null && auth.username!.isNotEmpty 
+                            ? auth.username![0].toUpperCase() 
+                            : 'U',
+                        style: const TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),

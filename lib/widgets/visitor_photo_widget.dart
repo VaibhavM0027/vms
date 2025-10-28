@@ -7,10 +7,12 @@ class VisitorPhotoWidget extends StatelessWidget {
   final BoxFit fit;
   final bool enableEnlarge;
   final String? heroTag;
+  final String? visitorName; // Add visitor name parameter
 
   const VisitorPhotoWidget({
     super.key,
     required this.photoUrl,
+    this.visitorName, // Add visitor name parameter
     this.height = 150,
     this.width = 150,
     this.fit = BoxFit.cover,
@@ -48,6 +50,21 @@ class VisitorPhotoWidget extends StatelessWidget {
                       child: Image.network(
                         photoUrl,
                         fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 200,
+                            width: 200,
+                            color: Colors.grey[700],
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
                             height: 200,
@@ -93,10 +110,17 @@ class VisitorPhotoWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey[600]!),
         ),
-        child: const Icon(
-          Icons.person,
-          size: 40,
-          color: Colors.grey,
+        child: Center(
+          child: Text(
+            visitorName != null && visitorName!.isNotEmpty 
+                ? visitorName![0].toUpperCase() 
+                : '?',
+            style: TextStyle(
+              fontSize: height * 0.4,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[300],
+            ),
+          ),
         ),
       );
     }
@@ -127,30 +151,23 @@ class VisitorPhotoWidget extends StatelessWidget {
           // Log the specific error for debugging
           print('Error loading image from URL: $photoUrl');
           print('Error details: $error');
+          print('Stack trace: $stackTrace');
           
+          // Show initial instead of question mark
           return Container(
             height: height,
             width: width,
             color: Colors.grey[700],
             child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.broken_image,
-                    color: Colors.grey,
-                    size: 40,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Image failed to load',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey[300],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              child: Text(
+                visitorName != null && visitorName!.isNotEmpty 
+                    ? visitorName![0].toUpperCase() 
+                    : '?',
+                style: TextStyle(
+                  fontSize: height * 0.4,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[300],
+                ),
               ),
             ),
           );

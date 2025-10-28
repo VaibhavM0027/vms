@@ -84,20 +84,67 @@ class _HostApprovalScreenState extends State<HostApprovalScreen> {
               return Card(
                 margin: const EdgeInsets.all(8),
                 child: ListTile(
-                  leading: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.grey[300],
-                    backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
-                        ? NetworkImage(visitor.photoUrl!)
-                        : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
-                            ? NetworkImage(visitor.idImageUrl!)
-                            : null,
-                    child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
-                        ? Text(
-                            visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          )
-                        : null,
+                  leading: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      color: Colors.grey[300],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                          ? Image.network(
+                              visitor.photoUrl!,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: 48,
+                                  height: 48,
+                                  color: Colors.grey[300],
+                                  child: Center(
+                                    child: Text(
+                                      visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                              ? Image.network(
+                                  visitor.idImageUrl!,
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      width: 48,
+                                      height: 48,
+                                      color: Colors.grey[300],
+                                      child: Center(
+                                        child: Text(
+                                          visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Container(
+                                  width: 48,
+                                  height: 48,
+                                  color: Colors.grey[300],
+                                  child: Center(
+                                    child: Text(
+                                      visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                    ),
                   ),
                   title: Text(visitor.name),
                   subtitle: Column(

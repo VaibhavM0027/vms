@@ -154,20 +154,67 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 // Display visitor photo if available
                 if ((visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty) || (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)) ...[
                   Center(
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.grey[300],
-                      backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
-                          ? NetworkImage(visitor.photoUrl!)
-                          : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
-                              ? NetworkImage(visitor.idImageUrl!)
-                              : null,
-                      child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
-                          ? Text(
-                              visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 32),
-                            )
-                          : null,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(50),
+                        color: Colors.grey[300],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(50),
+                        child: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                            ? Image.network(
+                                visitor.photoUrl!,
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey[300],
+                                    child: Center(
+                                      child: Text(
+                                        visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 32),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                                ? Image.network(
+                                    visitor.idImageUrl!,
+                                    width: 100,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 100,
+                                        height: 100,
+                                        color: Colors.grey[300],
+                                        child: Center(
+                                          child: Text(
+                                            visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 32),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey[300],
+                                    child: Center(
+                                      child: Text(
+                                        visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 32),
+                                      ),
+                                    ),
+                                  ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),

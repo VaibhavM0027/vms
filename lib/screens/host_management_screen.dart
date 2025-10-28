@@ -181,11 +181,21 @@ class _HostManagementScreenState extends State<HostManagementScreen> {
                         color: Colors.grey[850],
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: host.isActive ? Colors.green : Colors.grey,
-                            child: Text(
-                              host.name.isNotEmpty ? host.name[0].toUpperCase() : 'H',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              color: host.isActive ? Colors.green : Colors.grey,
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Center(
+                                child: Text(
+                                  host.name.isNotEmpty ? host.name[0].toUpperCase() : 'H',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                              ),
                             ),
                           ),
                           title: Text(

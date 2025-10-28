@@ -156,24 +156,109 @@ class _VisitorStatusScreenState extends State<VisitorStatusScreen> {
                     child: Column(
                       children: [
                         // Profile picture
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundColor: Colors.grey[300],
-                          backgroundImage: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
-                              ? NetworkImage(visitor.photoUrl!)
-                              : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
-                                  ? NetworkImage(visitor.idImageUrl!)
-                                  : null,
-                          child: ((visitor.photoUrl == null || visitor.photoUrl!.isEmpty) && (visitor.idImageUrl == null || visitor.idImageUrl!.isEmpty))
-                              ? Text(
-                                  visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
-                                  style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
-                                )
-                              : null,
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(40),
+                            color: Colors.grey[300],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(40),
+                            child: (visitor.photoUrl != null && visitor.photoUrl!.isNotEmpty)
+                                ? Image.network(
+                                    visitor.photoUrl!,
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: Colors.grey[700],
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            value: loadingProgress.expectedTotalBytes != null
+                                                ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                : null,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: Colors.grey[300],
+                                        child: Center(
+                                          child: Text(
+                                            visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                            style: const TextStyle(
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
+                                    ? Image.network(
+                                        visitor.idImageUrl!,
+                                        width: 80,
+                                        height: 80,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, loadingProgress) {
+                                          if (loadingProgress == null) return child;
+                                          return Container(
+                                            width: 80,
+                                            height: 80,
+                                            color: Colors.grey[700],
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                value: loadingProgress.expectedTotalBytes != null
+                                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                    : null,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            width: 80,
+                                            height: 80,
+                                            color: Colors.grey[300],
+                                            child: Center(
+                                              child: Text(
+                                                visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                                style: const TextStyle(
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black87,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: Colors.grey[300],
+                                        child: Center(
+                                          child: Text(
+                                            visitor.name.isNotEmpty ? visitor.name[0].toUpperCase() : '?',
+                                            style: const TextStyle(
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         // Status icon and text

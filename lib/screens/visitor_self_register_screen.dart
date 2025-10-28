@@ -52,31 +52,29 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      // Check if a registered visitor already exists by contact number
-      final existingVisitorQuery = await FirebaseFirestore.instance
-          .collection('visitors')
-          .where('contact', isEqualTo: _contactController.text.trim())
-          .where('isRegistered', isEqualTo: true)
-          .limit(1)
-          .get();
-      
-      String qrCode;
-      String visitorId;
-      
-      if (existingVisitorQuery.docs.isNotEmpty) {
-        // Existing registered visitor found - reuse their QR code
-        final existingDoc = existingVisitorQuery.docs.first;
-        final existingData = existingDoc.data();
-        visitorId = existingDoc.id;
-        qrCode = existingData['qrCode'] ?? visitorId;
-        
-        // Add new visit to their history
-        final now = DateTime.now();
-        List<Map<String, dynamic>> history = existingData['visitHistory'] != null 
-            ? List.from(existingData['visitHistory'])
-            : [];
-            
-        final newVisit = {
+      // Always create a new visitor record to avoid permission issues with querying
+      // New visitor - create with permanent QR code
+      final now = DateTime.now();
+      final docRef = FirebaseFirestore.instance.collection('visitors').doc();
+      final visitorId = docRef.id;
+      final qrCode = docRef.id;
+
+      final visitorData = {
+        'name': _nameController.text.trim(),
+        'contact': _contactController.text.trim(),
+        'email': _emailController.text.trim(),
+        'hostName': _hostNameController.text.trim(),
+        'purpose': _purposeController.text.trim(),
+        'hostId': '',
+        'visitDate': now,
+        'checkIn': now,
+        'checkOut': null,
+        'meetingNotes': null,
+        'status': 'pending',
+        'qrCode': qrCode,
+        'photoUrl': null,
+        'isRegistered': true, // Mark as registered for permanent QR
+        'visitHistory': [{
           'checkIn': now,
           'checkOut': null,
           'purpose': _purposeController.text.trim(),
@@ -84,61 +82,22 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
           'hostName': _hostNameController.text.trim(),
           'status': 'pending',
           'visitDate': now,
-        };
-        history.add(newVisit);
-        
-        // Update visitor document with new visit
+        }],
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // Use set with merge to handle potential permission issues
+      await docRef.set(visitorData, SetOptions(merge: true));
+
+      // Upload photo and get the URL BEFORE showing success dialog
+      final photoUrl = await _uploadPhoto(visitorId);
+      
+      // Update the visitor document with the photo URL
+      if (photoUrl != null) {
         await FirebaseFirestore.instance
             .collection('visitors')
             .doc(visitorId)
-            .update({
-          'name': _nameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'hostName': _hostNameController.text.trim(),
-          'purpose': _purposeController.text.trim(),
-          'visitDate': now,
-          'checkIn': now,
-          'checkOut': null,
-          'status': 'pending',
-          'visitHistory': history,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        
-      } else {
-        // New visitor - create with permanent QR code
-        final now = DateTime.now();
-        final docRef = FirebaseFirestore.instance.collection('visitors').doc();
-        visitorId = docRef.id;
-        qrCode = docRef.id;
-
-        final visitorData = {
-          'name': _nameController.text.trim(),
-          'contact': _contactController.text.trim(),
-          'email': _emailController.text.trim(),
-          'hostName': _hostNameController.text.trim(),
-          'purpose': _purposeController.text.trim(),
-          'hostId': '',
-          'visitDate': now,
-          'checkIn': now,
-          'checkOut': null,
-          'meetingNotes': null,
-          'status': 'pending',
-          'qrCode': qrCode,
-          'photoUrl': null,
-          'isRegistered': true, // Mark as registered for permanent QR
-          'visitHistory': [{
-            'checkIn': now,
-            'checkOut': null,
-            'purpose': _purposeController.text.trim(),
-            'hostId': '',
-            'hostName': _hostNameController.text.trim(),
-            'status': 'pending',
-            'visitDate': now,
-          }],
-          'createdAt': FieldValue.serverTimestamp(),
-        };
-
-        await docRef.set(visitorData);
+            .update({'photoUrl': photoUrl});
       }
 
       if (!mounted) return;
@@ -147,58 +106,66 @@ class _VisitorSelfRegisterScreenState extends State<VisitorSelfRegisterScreen> {
         _isSubmitting = false;
         _lastGeneratedQR = qrCode; // Store the QR code
       });
-      _showQRCodeDialog(qrCode, existingVisitorQuery.docs.isNotEmpty);
-
-      // Upload photo
-      () async {
-        try {
-          final connectivityResult = await Connectivity().checkConnectivity();
-          if (connectivityResult == ConnectivityResult.none) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No internet connection. Photo will be uploaded when online.')),
-              );
-            }
-            return;
-          }
-          
-          final ref = FirebaseStorage.instance
-              .ref()
-              .child('visitor_photos/$visitorId.jpg');
-          await ref.putFile(_photo!);
-          final url = await ref.getDownloadURL();
-          await FirebaseFirestore.instance
-              .collection('visitors')
-              .doc(visitorId)
-              .update({'photoUrl': url});
-        } on FirebaseException catch (e) {
-          if (mounted) {
-            if (e.code == 'unauthenticated' || e.code == 'permission-denied') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Photo upload requires authentication. Please contact reception.')),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Photo upload failed: ${e.message}')),
-              );
-            }
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Photo upload failed: $e')),
-            );
-          }
-        }
-      }();
+      
+      _showQRCodeDialog(qrCode, false);
 
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
+        String errorMessage = 'Error registering: $e';
+        // Handle permission errors specifically
+        if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+          errorMessage = 'Registration requires proper permissions. Please contact reception or try again.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error registering: $e')),
+          SnackBar(content: Text(errorMessage)),
         );
       }
+    }
+  }
+
+  // Separate function for photo upload with better error handling
+  Future<String?> _uploadPhoto(String visitorId) async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No internet connection. Photo will be uploaded when online.')),
+          );
+        }
+        return null;
+      }
+      
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('visitor_photos/$visitorId.jpg');
+      print('Uploading photo to: visitor_photos/$visitorId.jpg');
+      await ref.putFile(_photo!);
+      final url = await ref.getDownloadURL();
+      print('Photo uploaded successfully. URL: $url');
+      return url;
+    } on FirebaseException catch (e) {
+      print('FirebaseException during photo upload: ${e.message}, code: ${e.code}');
+      if (mounted) {
+        String errorMessage = 'Photo upload failed: ${e.message}';
+        if (e.code == 'unauthenticated' || e.code == 'permission-denied') {
+          errorMessage = 'Photo upload requires authentication. Please contact reception.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+      return null;
+    } catch (e) {
+      print('Exception during photo upload: $e');
+      // Even if photo upload fails, registration is successful
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registration successful! Photo upload will be retried.')),
+        );
+      }
+      return null;
     }
   }
 

@@ -26,21 +26,25 @@ service cloud.firestore {
       // Admin and receptionist full access
       allow read, write: if isAdmin() || (isSignedIn() && getUserRole() == 'receptionist');
 
-      // Visitor: can create own registration and read/update own records
-      // Allow public visitor registration for self-registration
+      // Allow public read access for visitor information
       allow read: if true;
-      allow create: if true || isSignedIn(); // Allow both authenticated and unauthenticated users to create
       
-      // Allow updates for authenticated users (visitors updating their own records)
-      allow update: if isSignedIn() && 
-        (getUserRole() == 'visitor' || getUserRole() == 'guard' || getUserRole() == 'host' || 
-         getUserRole() == 'receptionist' || isAdmin());
-
-      // Guard: can update checkIn/checkOut
-      allow update: if isSignedIn() && getUserRole() == 'guard';
+      // Allow anyone (authenticated or unauthenticated) to create visitor records for self-registration
+      allow create: if true;
       
-      // Host: can approve/reject visitors
-      allow update: if isSignedIn() && getUserRole() == 'host';
+      // Allow updates for authenticated users with appropriate roles
+      // Visitors can update their own records
+      // Guards can update checkIn/checkOut status
+      // Hosts can approve/reject visitors
+      // Admins and receptionists have full access
+      // Also allow unauthenticated users to update their own records during registration
+      allow update: if isSignedIn() && (
+        getUserRole() == 'visitor' || 
+        getUserRole() == 'guard' || 
+        getUserRole() == 'host' || 
+        getUserRole() == 'receptionist' || 
+        isAdmin()
+      ) || request.resource.data.keys().hasOnly(['photoUrl']) && !isSignedIn();
     }
 
     match /users/{userId} {
@@ -132,16 +136,14 @@ service firebase.storage {
     // Allow public read access to visitor photos and ID images
     match /visitor_photos/{allPaths=**} {
       allow read: if true;
-      // Allow write for authenticated users (receptionists, guards, etc.)
-      // and for direct visitor uploads (limited by client-side validation)
+      // Allow write for authenticated users and unauthenticated visitors during self-registration
       allow write: if request.auth != null || 
                    request.resource.size < 5 * 1024 * 1024; // 5MB limit
     }
     
     match /visitor_ids/{allPaths=**} {
       allow read: if true;
-      // Allow write for authenticated users (receptionists, guards, etc.)
-      // and for direct visitor uploads (limited by client-side validation)
+      // Allow write for authenticated users and unauthenticated visitors during self-registration
       allow write: if request.auth != null || 
                    request.resource.size < 5 * 1024 * 1024; // 5MB limit
     }

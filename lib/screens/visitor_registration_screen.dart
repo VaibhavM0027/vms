@@ -81,7 +81,9 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
             DateTime.now().millisecondsSinceEpoch.toString(), // temporary ID
             _visitorPhoto!.path,
           );
+          print('Temporary photo uploaded with URL: $_visitorPhotoUrl');
         } on Exception catch (e) {
+          print('Photo upload failed: ${e.toString()}');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Photo upload failed: ${e.toString()}')),
@@ -138,6 +140,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
               visitorId,
               _visitorPhoto!.path,
             );
+            print('Visitor photo uploaded with URL: $photoUrl');
             
             // Update visitor with photo URL
             await _firebaseServices.updateVisitor(
@@ -156,7 +159,9 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                 photoUrl: photoUrl, // Updated photo URL
               ),
             );
+            print('Visitor record updated with photo URL');
           } on Exception catch (e) {
+            print('Photo upload failed after registration: ${e.toString()}');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Photo upload failed after registration: ${e.toString()}')),
@@ -184,14 +189,28 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
         _visitorPhotoUrl = null;
       });
     } catch (e) {
+      print('Registration error: $e');
       // Handle the error with proper error handling
-      await ErrorHandler.handleError(
-        context: context,
-        error: e,
-        showSnackBar: true,
-      );
+      if (mounted) {
+        String errorMessage = 'Registration failed. Please try again.';
+        // Handle permission errors specifically
+        if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+          errorMessage = 'Registration requires proper permissions. Please contact reception or try again.';
+        }
+        // Handle Firestore permission errors more specifically
+        else if (e.toString().contains('firestore') && (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED'))) {
+          errorMessage = 'Registration requires proper permissions. Please contact reception or try again.';
+        }
+        await ErrorHandler.handleError(
+          context: context,
+          error: Exception(errorMessage),
+          showSnackBar: true,
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -490,7 +509,7 @@ class _VisitorRegistrationScreenState extends State<VisitorRegistrationScreen> {
                       Center(
                         child: _visitorPhoto != null
                             ? VisitorPhotoWidget(
-                                photoUrl: '',
+                                photoUrl: _visitorPhoto!.path,
                                 height: 150,
                                 width: 150,
                                 enableEnlarge: true,

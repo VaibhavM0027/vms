@@ -154,6 +154,16 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
 
                   final visitors = snapshot.data ?? [];
                   final filteredVisitors = _filterVisitors(visitors);
+                  
+                  // Sort visitors: pending at top, then by visit date (newest first)
+                  filteredVisitors.sort((a, b) {
+                    // Pending visitors at the top
+                    if (a.status == 'pending' && b.status != 'pending') return -1;
+                    if (b.status == 'pending' && a.status != 'pending') return 1;
+                    
+                    // For visitors with same status, sort by visit date (newest first)
+                    return b.visitDate.compareTo(a.visitDate);
+                  });
 
                   if (filteredVisitors.isEmpty) {
                     return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -225,9 +235,11 @@ class _VisitorListScreenState extends State<VisitorListScreen> {
                                             : (visitor.idImageUrl != null && visitor.idImageUrl!.isNotEmpty)
                                                 ? visitor.idImageUrl!
                                                 : null,
+                                        visitorName: visitor.name,
                                         height: 40,
                                         width: 40,
                                         enableEnlarge: false,
+                                        heroTag: 'visitor_list_${visitor.id}',
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(

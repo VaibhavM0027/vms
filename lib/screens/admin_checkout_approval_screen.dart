@@ -185,23 +185,76 @@ class _AdminCheckoutApprovalScreenState extends State<AdminCheckoutApprovalScree
                                 idImageUrl = visitorData?['idImageUrl'];
                               }
                               
-                              return CircleAvatar(
-                                radius: 20,
-                                backgroundColor: Colors.blue.shade100,
-                                backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
-                                    ? NetworkImage(photoUrl)
-                                    : (idImageUrl != null && idImageUrl.isNotEmpty)
-                                        ? NetworkImage(idImageUrl)
-                                        : null,
-                                child: ((photoUrl == null || photoUrl.isEmpty) && (idImageUrl == null || idImageUrl.isEmpty))
-                                    ? Text(
-                                        visitorInitial,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.blue.shade800,
-                                        ),
-                                      )
-                                    : null,
+                              return Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  color: Colors.blue.shade100,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: (photoUrl != null && photoUrl.isNotEmpty)
+                                      ? Image.network(
+                                          photoUrl,
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              width: 40,
+                                              height: 40,
+                                              color: Colors.blue.shade100,
+                                              child: Center(
+                                                child: Text(
+                                                  visitorInitial,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.blue.shade800,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : (idImageUrl != null && idImageUrl.isNotEmpty)
+                                          ? Image.network(
+                                              idImageUrl,
+                                              width: 40,
+                                              height: 40,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Container(
+                                                  width: 40,
+                                                  height: 40,
+                                                  color: Colors.blue.shade100,
+                                                  child: Center(
+                                                    child: Text(
+                                                      visitorInitial,
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.blue.shade800,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            )
+                                          : Container(
+                                              width: 40,
+                                              height: 40,
+                                              color: Colors.blue.shade100,
+                                              child: Center(
+                                                child: Text(
+                                                  visitorInitial,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.blue.shade800,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                ),
                               );
                             },
                           ),
