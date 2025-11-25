@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'scan_id_screen.dart';
 import 'visitor_list_screen.dart';
 import 'checkout_screen.dart';
 import 'reports_screen.dart';
@@ -182,13 +181,6 @@ class DashboardScreen extends StatelessWidget {
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
           children: [
-            if (role == 'admin' || role == 'receptionist')
-              _buildDashboardItem(
-                context,
-                Icons.person_add,
-                'Register Visitor',
-                const ScanIdScreen(),
-              ),
             if (role == 'admin' || role == 'receptionist')
               _buildDashboardItem(
                 context,
